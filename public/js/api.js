@@ -454,14 +454,19 @@ const api = {
       let processedPath = '';
       let processedSize = file.size;
 
+      let thumbPath = '';
       if (isImg && window.compressImage) {
         try {
           const comp = await window.compressImage(file, 1400, 0.82);
-          processedPath = comp.dataUrl;
-          processedSize = comp.size || file.size;
+          processedPath = (comp && comp.dataUrl) ? comp.dataUrl : (typeof comp === 'string' ? comp : '');
+          processedSize = (comp && comp.size) ? comp.size : file.size;
         } catch (e) {
           console.warn('Image compression fallback:', e);
         }
+        try {
+          const thumbComp = await window.compressImage(file, 120, 0.6);
+          thumbPath = (thumbComp && thumbComp.dataUrl) ? thumbComp.dataUrl : (typeof thumbComp === 'string' ? thumbComp : '');
+        } catch (e) {}
       }
 
       if (!processedPath) {
@@ -471,6 +476,9 @@ const api = {
           reader.onerror = () => resolve('');
           reader.readAsDataURL(file);
         });
+      }
+      if (!thumbPath && isImg) {
+        thumbPath = processedPath;
       }
 
       const title = (extraData && extraData.title) ? extraData.title : file.name;
@@ -484,6 +492,7 @@ const api = {
         content,
         file_name: file.name,
         file_path: processedPath,
+        thumbnail: thumbPath,
         file_size: processedSize,
         mime_type: file.type || (isImg ? 'image/jpeg' : 'application/octet-stream'),
         folder_id: folderId,

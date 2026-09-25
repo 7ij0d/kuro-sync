@@ -23,9 +23,6 @@ function openItemViewer(itemId) {
   if (titleInput) {
     titleInput.value = item.title || '';
   }
-  if (titleEl) {
-    titleEl.textContent = item.title || '';
-  }
   activeViewerItem._newImageFilePath = null;
   activeViewerItem._newImageFileSize = null;
 
@@ -73,9 +70,7 @@ function openItemViewer(itemId) {
       });
     }
   } else if (item.type === 'image') {
-    const fileUrl = item.file_path 
-      ? (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('assets') ? item.file_path : `/api/items/${item.id}/file`) 
-      : '';
+    const fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
 
     bodyEl.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; gap:16px;">
@@ -152,9 +147,7 @@ function openItemViewer(itemId) {
     }
   } else if (item.type === 'file') {
     const isPdf = (item.mime_type && item.mime_type.includes('pdf')) || (item.file_name && item.file_name.toLowerCase().endsWith('.pdf'));
-    const fileUrl = item.file_path 
-      ? (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('assets') ? item.file_path : `/api/items/${item.id}/file`) 
-      : `/api/items/${item.id}/file`;
+    const fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`);
 
     if (isPdf) {
       bodyEl.innerHTML = `
@@ -315,9 +308,7 @@ async function copyViewerCombined(itemId, btn) {
   if (!activeViewerItem) return;
   const editor = document.getElementById('viewer-img-notes');
   const text = editor ? editor.value : (activeViewerItem.content || '');
-  const imgUrl = (activeViewerItem.file_path && (activeViewerItem.file_path.startsWith('data:') || activeViewerItem.file_path.startsWith('http') || activeViewerItem.file_path.startsWith('./') || activeViewerItem.file_path.startsWith('blob:')))
-    ? activeViewerItem.file_path
-    : `/api/items/${activeViewerItem.id}/file`;
+  const imgUrl = window.getItemFileUrl ? window.getItemFileUrl(activeViewerItem) : (typeof activeViewerItem.file_path === 'string' ? activeViewerItem.file_path : `/api/items/${activeViewerItem.id}/file`);
 
   const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
   const success = await window.clipboardEngine.copyCombined(text, imgUrl, activeViewerItem.title || '');
@@ -431,20 +422,26 @@ async function handleViewerImageReplace(input) {
 
   try {
     let compressedDataUrl = '';
+    let thumbDataUrl = '';
+
     if (window.utils && window.utils.compressImage) {
-      compressedDataUrl = await window.utils.compressImage(file, 1200, 0.8);
-    } else {
+      try {
+        const comp = await window.utils.compressImage(file, 1200, 0.8);
+        compressedDataUrl = (comp && comp.dataUrl) ? comp.dataUrl : (typeof comp === 'string' ? comp : '');
+      } catch (e) {}
+      try {
+        const thumbComp = await window.utils.compressImage(file, 120, 0.6);
+        thumbDataUrl = (thumbComp && thumbComp.dataUrl) ? thumbComp.dataUrl : (typeof thumbComp === 'string' ? thumbComp : '');
+      } catch (e) {}
+    }
+
+    if (!compressedDataUrl) {
       compressedDataUrl = await new Promise((res, rej) => {
         const reader = new FileReader();
         reader.onload = e => res(e.target.result);
         reader.onerror = rej;
         reader.readAsDataURL(file);
       });
-    }
-
-    let thumbDataUrl = '';
-    if (window.utils && window.utils.compressImage) {
-      thumbDataUrl = await window.utils.compressImage(file, 120, 0.6);
     }
 
     activeViewerItem._newImageFilePath = compressedDataUrl;

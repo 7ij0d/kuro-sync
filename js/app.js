@@ -201,6 +201,17 @@ function renderItemsFeed(items = []) {
     return;
   }
 
+  // Safe card renderer with error boundary
+  const renderSafeCard = (item) => {
+    try {
+      if (!item) return '';
+      return window.renderItemCard(item, window.currentView) || '';
+    } catch (err) {
+      console.error('Error rendering card for item:', item && item.id, err);
+      return '';
+    }
+  };
+
   // Group items by date (Today, Yesterday, Earlier)
   const grouped = window.utils.groupItemsByDate(items);
   let html = '';
@@ -210,7 +221,7 @@ function renderItemsFeed(items = []) {
       <div class="date-group">
         <div class="date-section-header">${t('today')}</div>
         <div class="items-list">
-          ${grouped.today.map(item => window.renderItemCard(item, window.currentView)).join('')}
+          ${grouped.today.map(renderSafeCard).join('')}
         </div>
       </div>
     `;
@@ -221,7 +232,7 @@ function renderItemsFeed(items = []) {
       <div class="date-group" style="margin-top:24px;">
         <div class="date-section-header">${t('yesterday')}</div>
         <div class="items-list">
-          ${grouped.yesterday.map(item => window.renderItemCard(item, window.currentView)).join('')}
+          ${grouped.yesterday.map(renderSafeCard).join('')}
         </div>
       </div>
     `;
@@ -232,10 +243,15 @@ function renderItemsFeed(items = []) {
       <div class="date-group" style="margin-top:24px;">
         <div class="date-section-header">${t('earlier')}</div>
         <div class="items-list">
-          ${grouped.earlier.map(item => window.renderItemCard(item, window.currentView)).join('')}
+          ${grouped.earlier.map(renderSafeCard).join('')}
         </div>
       </div>
     `;
+  }
+
+  // Fallback if date grouping produced empty output
+  if (!html.trim()) {
+    html = `<div class="items-list">${items.map(renderSafeCard).join('')}</div>`;
   }
 
   container.innerHTML = html;
@@ -348,9 +364,7 @@ async function copyCardText(itemId, btn) {
 async function copyCardImage(itemId, btn) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
-  const imgUrl = (item.file_path && (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')))
-    ? item.file_path
-    : `/api/items/${item.id}/file`;
+  const imgUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`);
 
   const success = await window.clipboardEngine.copyImage(imgUrl);
   if (success && btn) {
@@ -370,9 +384,7 @@ async function copyCardImage(itemId, btn) {
 async function copyCardCombined(itemId, btn) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
-  const imgUrl = (item.file_path && (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')))
-    ? item.file_path
-    : `/api/items/${item.id}/file`;
+  const imgUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`);
 
   const success = await window.clipboardEngine.copyCombined(item.content || '', imgUrl, item.title || '');
   if (success && btn) {
@@ -391,14 +403,17 @@ async function copyCardCombined(itemId, btn) {
 
 function downloadItemFile(itemId) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
-  if (item && item.file_path) {
-    const a = document.createElement('a');
-    a.href = item.file_path;
-    a.download = item.file_name || item.title || 'file';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    return;
+  if (item) {
+    const fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
+    if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.startsWith('http') || fileUrl.startsWith('blob:') || fileUrl.startsWith('./') || fileUrl.startsWith('/'))) {
+      const a = document.createElement('a');
+      a.href = fileUrl;
+      a.download = item.file_name || item.title || 'file';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
   }
   window.location.href = `/api/items/${itemId}/file?download=1`;
 }

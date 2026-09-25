@@ -2,25 +2,34 @@
 // KURO SYNC CARD COMPONENT (Matches Reference UI Exactly)
 // ==========================================================
 
+// Safe helper to extract file/image URL from any item format
+function getItemFileUrl(item) {
+  if (!item) return '';
+  if (item.thumbnail && typeof item.thumbnail === 'string') return item.thumbnail;
+  let p = item.file_path;
+  if (p && typeof p === 'object' && p.dataUrl) p = p.dataUrl;
+  if (typeof p === 'string') {
+    if (p.startsWith('data:') || p.startsWith('http') || p.startsWith('./') || p.startsWith('blob:') || p.startsWith('assets') || p.startsWith('/')) {
+      return p;
+    }
+  }
+  return item.id ? `/api/items/${item.id}/file` : '';
+}
+window.getItemFileUrl = getItemFileUrl;
+
 function renderItemCard(item, currentView = 'all') {
+  if (!item) return '';
   const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
   const isTrash = item.deleted_at !== null;
 
   // Media / Icon thumbnail box
   let mediaHtml = '';
   if (item.type === 'image') {
-    let imgUrl = item.thumbnail || '';
-    if (!imgUrl && item.file_path) {
-      if (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')) {
-        imgUrl = item.file_path;
-      } else {
-        imgUrl = `/api/items/${item.id}/file`;
-      }
-    }
+    let imgUrl = getItemFileUrl(item);
     if (!imgUrl) {
       imgUrl = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
     }
-    mediaHtml = `<img src="${imgUrl}" alt="${escapeHtml(item.title)}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />`;
+    mediaHtml = `<img src="${imgUrl}" alt="${escapeHtml(item.title || 'Image')}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />`;
   } else if (item.type === 'file') {
     mediaHtml = `
       <div class="type-icon-pdf">

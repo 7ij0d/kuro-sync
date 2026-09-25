@@ -81,7 +81,18 @@ const KuroSupabase = {
   getCachedItems() {
     try {
       const raw = localStorage.getItem('kuro_cached_supabase_items');
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.map(item => {
+        if (!item || typeof item !== 'object') return null;
+        if (item.file_path && typeof item.file_path === 'object' && item.file_path.dataUrl) {
+          item.file_path = item.file_path.dataUrl;
+        } else if (item.file_path && typeof item.file_path === 'object') {
+          item.file_path = '';
+        }
+        return item;
+      }).filter(Boolean);
     } catch (e) {
       return null;
     }
@@ -93,16 +104,25 @@ const KuroSupabase = {
       // Ultra-lightweight cache: keeps metadata, notes, and tiny thumbnails (< 30KB total)
       // Never exceeds localStorage quota and loads in 0.0001 seconds
       const lightweight = items.map(item => {
+        if (!item) return null;
         const copy = { ...item };
-        if (copy.file_path && copy.file_path.length > 5000) {
-          if (copy.thumbnail) {
-            copy.file_path = copy.thumbnail;
+        let fp = copy.file_path;
+        if (fp && typeof fp === 'object' && fp.dataUrl) fp = fp.dataUrl;
+        if (typeof fp === 'string') {
+          if (fp.length > 5000) {
+            if (copy.thumbnail && typeof copy.thumbnail === 'string') {
+              copy.file_path = copy.thumbnail;
+            } else {
+              delete copy.file_path;
+            }
           } else {
-            delete copy.file_path;
+            copy.file_path = fp;
           }
+        } else {
+          delete copy.file_path;
         }
         return copy;
-      });
+      }).filter(Boolean);
       localStorage.setItem('kuro_cached_supabase_items', JSON.stringify(lightweight));
     } catch (e) {
       console.warn('localStorage setCachedItems error:', e);
@@ -127,7 +147,21 @@ const KuroSupabase = {
       }
     }
 
-    let items = (Array.isArray(rows) ? rows : []).map(r => r.value).filter(Boolean);
+    let items = (Array.isArray(rows) ? rows : []).map(r => {
+      if (!r) return null;
+      let val = r.value;
+      if (typeof val === 'string') {
+        try { val = JSON.parse(val); } catch(e) {}
+      }
+      if (val && typeof val === 'object') {
+        if (val.file_path && typeof val.file_path === 'object' && val.file_path.dataUrl) {
+          val.file_path = val.file_path.dataUrl;
+        } else if (val.file_path && typeof val.file_path === 'object') {
+          val.file_path = '';
+        }
+      }
+      return val;
+    }).filter(Boolean);
 
     // Save active items to local cache for instant SWR loading on next visit
     if (!isTrash && !params.search && (!params.type || params.type === 'all')) {
