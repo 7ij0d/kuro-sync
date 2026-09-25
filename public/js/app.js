@@ -16,21 +16,7 @@ window.currentSearchTerm = '';
 window.currentSortOrder = 'newest';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Initialize i18n
-  if (window.i18n) window.i18n.init();
-
-  // 2. Initialize Theme
-  initTheme();
-
-  // 3. Initialize Offline & Clipboard
-  if (window.offlineManager) await window.offlineManager.init();
-  if (window.clipboardEngine) window.clipboardEngine.setupGlobalPaste();
-
-  // 4. Setup Controls & Drag Drop
-  if (window.setupHeaderControls) window.setupHeaderControls();
-  setupDragAndDrop();
-
-  // Instant SWR First Paint from local cache (0ms delay)
+  // 0. SWR Instant Zero-Delay First Paint from local cache (0ms delay)
   try {
     const cachedItems = (window.KuroSupabase && window.KuroSupabase.getCachedItems) ? window.KuroSupabase.getCachedItems() : null;
     if (cachedItems && Array.isArray(cachedItems) && cachedItems.length > 0) {
@@ -38,6 +24,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderItemsFeed(cachedItems);
     }
   } catch (e) {}
+
+  // 1. Initialize i18n
+  if (window.i18n) window.i18n.init();
+
+  // 2. Initialize Theme
+  initTheme();
+
+  // 3. Initialize Offline & Clipboard
+  if (window.offlineManager) window.offlineManager.init();
+  if (window.clipboardEngine) window.clipboardEngine.setupGlobalPaste();
+
+  // 4. Setup Controls & Drag Drop
+  if (window.setupHeaderControls) window.setupHeaderControls();
+  setupDragAndDrop();
 
   // 5. Check URL parameters (e.g. ?pair=KXXXXX)
   const urlParams = new URLSearchParams(window.location.search);
@@ -89,9 +89,9 @@ async function bootstrapSession() {
     // Connect WebSocket
     if (window.realtime) window.realtime.connect();
 
-    // Load Items & Folders
-    await refreshFolders();
-    await refreshItems();
+    // Load Items & Folders asynchronously without blocking UI paint
+    refreshFolders();
+    refreshItems();
     if (window.updateDeviceFilterOptions) {
       window.updateDeviceFilterOptions(meData.devices, meData.currentDeviceId);
     }

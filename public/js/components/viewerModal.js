@@ -11,7 +11,7 @@ function openItemViewer(itemId) {
 
   activeViewerItem = item;
   const modal = document.getElementById('viewer-modal');
-  const titleEl = document.getElementById('viewer-title');
+  const titleInput = document.getElementById('viewer-title-input');
   const bodyEl = document.getElementById('viewer-body-content');
   const metaDeviceEl = document.getElementById('viewer-meta-device');
   const metaTimeEl = document.getElementById('viewer-meta-time');
@@ -20,7 +20,15 @@ function openItemViewer(itemId) {
 
   if (!modal || !bodyEl) return;
 
-  titleEl.textContent = item.title;
+  if (titleInput) {
+    titleInput.value = item.title || '';
+  }
+  if (titleEl) {
+    titleEl.textContent = item.title || '';
+  }
+  activeViewerItem._newImageFilePath = null;
+  activeViewerItem._newImageFileSize = null;
+
   metaDeviceEl.textContent = `${item.device_name || 'iPad'}`;
   metaTimeEl.textContent = window.utils.formatTime(item.created_at);
   metaSizeEl.textContent = item.file_size ? window.utils.formatBytes(item.file_size) : (item.type.toUpperCase());
@@ -32,27 +40,38 @@ function openItemViewer(itemId) {
   // Render content based on type
   if (item.type === 'text' || item.type === 'clipboard' || item.type === 'note') {
     bodyEl.innerHTML = `
-      <div style="display:flex; flex-direction:column; gap:14px;">
-        <div style="display:flex; flex-direction:column; gap:6px;">
-          <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">عنوان الملاحظة / Title:</label>
-          <input type="text" id="viewer-body-title-input" value="${escapeHtml(item.title || '')}" style="width:100%; height:42px; padding:0 14px; font-size:1rem; font-weight:700; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أدخل عنواناً..." />
-        </div>
-
+      <div style="display:flex; flex-direction:column; gap:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
-          <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">المحتوى والملاحظات / Content:</label>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button class="btn-card-action" onclick="copyViewerText()">
-              ${window.i18n ? window.i18n.t('copy') : 'نسخ النص'}
-            </button>
-            <button class="btn-primary" id="viewer-body-save-btn" onclick="saveViewerItemChanges()" style="height:34px; padding-inline:16px; font-size:0.8125rem; font-weight:700;">
-              💾 حفظ التعديلات
-            </button>
-          </div>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-autosave-status">Auto-saved</span>
+          <button class="btn-card-action" onclick="copyViewerText()">
+            ${window.i18n ? window.i18n.t('copy') : 'Copy Text'}
+          </button>
         </div>
-
-        <textarea id="viewer-text-editor" style="width:100%; min-height:220px; padding:14px; font-size:0.9375rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="اكتب ملاحظاتك هنا...">${escapeHtml(item.content || '')}</textarea>
+        <textarea id="viewer-text-editor" style="width:100%; min-height:260px; padding:14px; font-size:0.9375rem; line-height:1.6; resize:vertical;" placeholder="Write your notes here...">${escapeHtml(item.content || '')}</textarea>
       </div>
     `;
+
+    // Setup live auto-save
+    const editor = document.getElementById('viewer-text-editor');
+    if (editor) {
+      editor.addEventListener('input', () => {
+        const statusEl = document.getElementById('viewer-autosave-status');
+        if (statusEl) statusEl.textContent = 'Saving...';
+
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(async () => {
+          try {
+            const newContent = editor.value;
+            await window.api.updateItem(item.id, { content: newContent });
+            item.content = newContent;
+            if (statusEl) statusEl.textContent = 'Saved ✓';
+            window.refreshItems();
+          } catch (e) {
+            if (statusEl) statusEl.textContent = 'Error saving';
+          }
+        }, 800);
+      });
+    }
   } else if (item.type === 'image') {
     const fileUrl = item.file_path 
       ? (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('assets') ? item.file_path : `/api/items/${item.id}/file`) 
@@ -60,10 +79,9 @@ function openItemViewer(itemId) {
 
     bodyEl.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; gap:16px;">
-        <div style="max-height:420px; width:100%; overflow:hidden; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; position:relative;">
-          <img id="viewer-img-element" src="${fileUrl}" alt="${escapeHtml(item.title)}" style="max-width:100%; max-height:420px; object-fit:contain;" />
+        <div style="max-height:420px; width:100%; overflow:hidden; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center;">
+          <img src="${fileUrl}" alt="${item.title}" style="max-width:100%; max-height:420px; object-fit:contain;" />
         </div>
-        
         <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%;">
           <button class="btn-card-action" onclick="copyCardImage('${item.id}', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -73,7 +91,6 @@ function openItemViewer(itemId) {
             </svg>
             <span class="btn-label">${window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة'}</span>
           </button>
-
           <button class="btn-card-action" onclick="copyViewerNotes('${item.id}', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -81,7 +98,6 @@ function openItemViewer(itemId) {
             </svg>
             <span class="btn-label">${window.i18n ? (window.i18n.t('copyText') || 'نسخ النص') : 'نسخ النص'}</span>
           </button>
-
           <button class="btn-card-action btn-card-both" onclick="copyViewerCombined('${item.id}', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
               <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -89,42 +105,51 @@ function openItemViewer(itemId) {
             </svg>
             <span class="btn-label">${window.i18n ? (window.i18n.t('copyBoth') || 'نسخ الاثنين معاً') : 'نسخ الاثنين معاً'}</span>
           </button>
-
-          <label class="btn-card-action" style="cursor:pointer;" title="تغيير الصورة واختيار صورة أخرى">
-            <input type="file" id="viewer-replace-image-file" accept="image/*" style="display:none;" onchange="handleViewerReplaceImage(event)" />
+          <button class="btn-card-action" onclick="document.getElementById('viewer-replace-image-input').click()" title="استبدال أو تغيير هذه الصورة">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
             </svg>
-            <span class="btn-label">🔄 تغيير الصورة</span>
-          </label>
-
+            <span class="btn-label">📷 تغيير الصورة</span>
+          </button>
+          <input type="file" id="viewer-replace-image-input" accept="image/*" style="display:none;" onchange="handleViewerImageReplace(this)" />
           <button class="btn-primary" onclick="downloadItemFile('${item.id}')">
             ⬇️ ${window.i18n ? window.i18n.t('download') : 'تحميل'}
           </button>
         </div>
 
-        <!-- Title & Notes Editing Section -->
-        <div style="width:100%; margin-top:8px; display:flex; flex-direction:column; gap:12px; background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">عنوان الصورة / Title:</label>
-            <input type="text" id="viewer-body-title-input" value="${escapeHtml(item.title || '')}" style="width:100%; height:40px; padding:0 12px; font-size:0.9375rem; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أدخل عنواناً لهذه الصورة..." />
-          </div>
-
-          <div style="display:flex; flex-direction:column; gap:6px;">
+        <!-- Notes / Description Section for Image -->
+        <div style="width:100%; margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
             <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">ملاحظات وشرح الصورة / Notes:</label>
-            <textarea id="viewer-img-notes" style="width:100%; min-height:100px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أضف أو عدّل ملاحظاتك وشرحك لهذه الصورة هنا...">${escapeHtml(item.content || '')}</textarea>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-img-notes-status"></span>
           </div>
-
-          <div style="display:flex; justify-content:flex-end; gap:8px;">
-            <button class="btn-primary" id="viewer-body-save-btn" onclick="saveViewerItemChanges()" style="padding-inline:18px; font-weight:700;">
-              💾 حفظ التعديلات
-            </button>
-          </div>
+          <textarea id="viewer-img-notes" style="width:100%; min-height:90px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface);" placeholder="أضف أو عدّل ملاحظاتك وشرحك لهذه الصورة هنا...">${escapeHtml(item.content || '')}</textarea>
         </div>
       </div>
     `;
+
+    // Setup live auto-save for image notes
+    const imgNotesEditor = document.getElementById('viewer-img-notes');
+    if (imgNotesEditor) {
+      imgNotesEditor.addEventListener('input', () => {
+        const statusEl = document.getElementById('viewer-img-notes-status');
+        if (statusEl) statusEl.textContent = 'جارٍ الحفظ...';
+
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(async () => {
+          try {
+            const newContent = imgNotesEditor.value;
+            await window.api.updateItem(item.id, { content: newContent });
+            item.content = newContent;
+            if (statusEl) statusEl.textContent = 'تم الحفظ ✓';
+            window.refreshItems();
+          } catch (e) {
+            if (statusEl) statusEl.textContent = 'خطأ في الحفظ';
+          }
+        }, 800);
+      });
+    }
   } else if (item.type === 'file') {
     const isPdf = (item.mime_type && item.mime_type.includes('pdf')) || (item.file_name && item.file_name.toLowerCase().endsWith('.pdf'));
     const fileUrl = item.file_path 
@@ -140,23 +165,13 @@ function openItemViewer(itemId) {
             <button class="btn-primary" onclick="downloadItemFile('${item.id}')">${window.i18n ? window.i18n.t('download') : 'تحميل'}</button>
           </div>
 
-          <!-- Title & Notes / Summary Section for PDF -->
-          <div style="width:100%; display:flex; flex-direction:column; gap:10px; background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">عنوان الملف / Title:</label>
-              <input type="text" id="viewer-body-title-input" value="${escapeHtml(item.title || '')}" style="width:100%; height:40px; padding:0 12px; font-size:0.9375rem; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أدخل عنواناً لهذا الملف..." />
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:4px;">
+          <!-- Notes / Summary Section for PDF -->
+          <div style="width:100%; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
               <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">ملاحظات وملخص الملف / Notes:</label>
-              <textarea id="viewer-file-notes" style="width:100%; min-height:85px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أضف أو عدّل ملاحظاتك أو ملخصك لهذا الملف هنا...">${escapeHtml(item.content || '')}</textarea>
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-file-notes-status"></span>
             </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-              <button class="btn-primary" id="viewer-body-save-btn" onclick="saveViewerItemChanges()" style="padding-inline:18px; font-weight:700;">
-                💾 حفظ التعديلات
-              </button>
-            </div>
+            <textarea id="viewer-file-notes" style="width:100%; min-height:85px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface);" placeholder="أضف أو عدّل ملاحظاتك أو ملخصك لهذا الملف هنا...">${escapeHtml(item.content || '')}</textarea>
           </div>
         </div>
       `;
@@ -177,23 +192,13 @@ function openItemViewer(itemId) {
             ${window.i18n ? window.i18n.t('download') : 'تحميل'}
           </button>
 
-          <!-- Title & Notes / Summary Section for Document -->
-          <div style="width:100%; text-align:initial; margin-top:10px; display:flex; flex-direction:column; gap:10px; background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">عنوان الملف / Title:</label>
-              <input type="text" id="viewer-body-title-input" value="${escapeHtml(item.title || '')}" style="width:100%; height:40px; padding:0 12px; font-size:0.9375rem; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أدخل عنواناً لهذا الملف..." />
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:4px;">
+          <!-- Notes / Summary Section for Document -->
+          <div style="width:100%; text-align:initial; margin-top:10px; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
               <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">ملاحظات وملخص الملف / Notes:</label>
-              <textarea id="viewer-file-notes" style="width:100%; min-height:85px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface); color:var(--text-primary);" placeholder="أضف أو عدّل ملاحظاتك أو ملخصك لهذا الملف هنا...">${escapeHtml(item.content || '')}</textarea>
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-file-notes-status"></span>
             </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-              <button class="btn-primary" id="viewer-body-save-btn" onclick="saveViewerItemChanges()" style="padding-inline:18px; font-weight:700;">
-                💾 حفظ التعديلات
-              </button>
-            </div>
+            <textarea id="viewer-file-notes" style="width:100%; min-height:85px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface);" placeholder="أضف أو عدّل ملاحظاتك أو ملخصك لهذا الملف هنا...">${escapeHtml(item.content || '')}</textarea>
           </div>
         </div>
       `;
@@ -328,143 +333,141 @@ async function copyViewerCombined(itemId, btn) {
   }
 }
 
-async function saveViewerItemChanges() {
+async function saveViewerItemChanges(btn) {
   if (!activeViewerItem) return;
 
-  const btn = document.getElementById('viewer-save-btn');
-  const bodyBtn = document.getElementById('viewer-body-save-btn');
-  const statusIndicator = document.getElementById('viewer-save-status-indicator');
-  const titleInput = document.getElementById('viewer-body-title-input');
-  const notesTextarea = document.getElementById('viewer-img-notes') || document.getElementById('viewer-file-notes') || document.getElementById('viewer-text-editor');
+  const titleInput = document.getElementById('viewer-title-input');
+  const newTitle = titleInput ? titleInput.value.trim() : (activeViewerItem.title || '');
+  if (!newTitle) {
+    if (window.utils) window.utils.showToast('يرجى كتابة عنوان للعنصر', 'warning');
+    return;
+  }
 
-  const newTitle = titleInput ? titleInput.value.trim() : activeViewerItem.title;
-  const newContent = notesTextarea ? notesTextarea.value : activeViewerItem.content;
+  // Find active content / notes editor
+  const textEditor = document.getElementById('viewer-text-editor');
+  const imgNotes = document.getElementById('viewer-img-notes');
+  const fileNotes = document.getElementById('viewer-file-notes');
+  const newContent = textEditor ? textEditor.value : (imgNotes ? imgNotes.value : (fileNotes ? fileNotes.value : (activeViewerItem.content || '')));
 
   const updates = {
-    title: newTitle || activeViewerItem.title || 'Untitled',
-    content: newContent !== undefined ? newContent : (activeViewerItem.content || '')
+    title: newTitle,
+    content: newContent
   };
 
-  if (activeViewerItem.pendingNewImage) {
-    updates.file_path = activeViewerItem.pendingNewImage;
-    updates.file_size = activeViewerItem.pendingNewImageSize || activeViewerItem.file_size;
-    delete activeViewerItem.pendingNewImage;
+  // If image was replaced
+  if (activeViewerItem._newImageFilePath) {
+    updates.file_path = activeViewerItem._newImageFilePath;
+    if (activeViewerItem._newImageFileSize) {
+      updates.file_size = activeViewerItem._newImageFileSize;
+    }
+    if (activeViewerItem._newThumbnail) {
+      updates.thumbnail = activeViewerItem._newThumbnail;
+    }
   }
 
-  // Visual feedback
-  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
-  const originalBtnText = btn ? btn.innerHTML : '💾 حفظ التعديلات';
+  // Visual feedback on button
+  let origText = '💾 حفظ التعديلات';
   if (btn) {
+    const label = btn.querySelector('.btn-label') || btn;
+    origText = label.textContent;
     btn.disabled = true;
-    btn.innerHTML = `<span>⏳ ${isAr ? 'جاري الحفظ...' : 'Saving...'}</span>`;
-  }
-  if (bodyBtn) {
-    bodyBtn.disabled = true;
-    bodyBtn.innerHTML = `<span>⏳ ${isAr ? 'جاري الحفظ...' : 'Saving...'}</span>`;
-  }
-  if (statusIndicator) {
-    statusIndicator.style.color = 'var(--text-muted)';
-    statusIndicator.textContent = isAr ? 'جارٍ الحفظ والمزامنة...' : 'Saving...';
+    label.textContent = '⏳ جاري الحفظ...';
   }
 
   try {
-    // 1. Instant local memory update
-    Object.assign(activeViewerItem, updates);
-
-    // Update header title
-    const headerTitle = document.getElementById('viewer-title');
-    if (headerTitle) headerTitle.textContent = activeViewerItem.title;
-
-    // 2. Persist to API / Supabase
     await window.api.updateItem(activeViewerItem.id, updates);
+    Object.assign(activeViewerItem, updates);
+    activeViewerItem._newImageFilePath = null;
 
-    // 3. Success feedback
+    // Update in window.currentItems
+    const idx = (window.currentItems || []).findIndex(i => String(i.id) === String(activeViewerItem.id));
+    if (idx !== -1) {
+      Object.assign(window.currentItems[idx], updates);
+    }
+
+    // Refresh Feed
+    if (window.renderItemsFeed) {
+      window.renderItemsFeed(window.currentItems);
+    }
+
+    // Update localStorage cache immediately
+    if (window.KuroSupabase && window.KuroSupabase.setCachedItems) {
+      window.KuroSupabase.setCachedItems(window.currentItems);
+    }
+
     if (btn) {
+      const label = btn.querySelector('.btn-label') || btn;
+      label.textContent = '✓ تم الحفظ بنجاح!';
       btn.style.background = 'var(--success)';
-      btn.innerHTML = `<span>✓ ${isAr ? 'تم الحفظ بنجاح' : 'Saved!'}</span>`;
-    }
-    if (bodyBtn) {
-      bodyBtn.style.background = 'var(--success)';
-      bodyBtn.innerHTML = `<span>✓ ${isAr ? 'تم الحفظ' : 'Saved!'}</span>`;
-    }
-    if (statusIndicator) {
-      statusIndicator.style.color = 'var(--success)';
-      statusIndicator.textContent = isAr ? 'تم الحفظ والمزامنة بالسحابة ✓' : 'Saved & Synced ✓';
-    }
-    if (window.utils) {
-      window.utils.showToast(isAr ? 'تم حفظ وتحديث التعديلات بنجاح! 💾' : 'Changes saved successfully!');
-    }
-
-    if (typeof window.refreshItems === 'function') {
-      window.refreshItems();
-    }
-
-    setTimeout(() => {
-      if (btn) {
+      btn.style.borderColor = 'var(--success)';
+      setTimeout(() => {
         btn.disabled = false;
+        label.textContent = origText;
         btn.style.background = '';
-        btn.innerHTML = isAr ? '💾 حفظ التعديلات' : '💾 Save Changes';
-      }
-      if (bodyBtn) {
-        bodyBtn.disabled = false;
-        bodyBtn.style.background = '';
-        bodyBtn.innerHTML = isAr ? '💾 حفظ التعديلات' : '💾 Save Changes';
-      }
-    }, 2000);
+        btn.style.borderColor = '';
+      }, 2500);
+    }
+
+    const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+    if (window.utils) {
+      window.utils.showToast(isAr ? 'تم حفظ العنوان والتعديلات بنجاح! 💾' : 'Title and changes saved! 💾');
+    }
   } catch (err) {
-    console.error('Error saving viewer item changes:', err);
+    console.error('Failed to save changes:', err);
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = originalBtnText;
+      const label = btn.querySelector('.btn-label') || btn;
+      label.textContent = origText;
     }
-    if (bodyBtn) {
-      bodyBtn.disabled = false;
-      bodyBtn.innerHTML = isAr ? '💾 حفظ التعديلات' : '💾 Save Changes';
-    }
-    if (statusIndicator) {
-      statusIndicator.style.color = 'var(--danger)';
-      statusIndicator.textContent = isAr ? 'خطأ في الحفظ' : 'Save Error';
-    }
-    if (window.utils) {
-      window.utils.showToast((isAr ? 'خطأ في الحفظ: ' : 'Error saving: ') + err.message, 'warning');
-    }
+    if (window.utils) window.utils.showToast(err.message || 'خطأ في الحفظ', 'warning');
   }
 }
 
-async function handleViewerReplaceImage(event) {
-  const file = event.target.files && event.target.files[0];
-  if (!file || !activeViewerItem) return;
+async function handleViewerImageReplace(input) {
+  if (!input.files || input.files.length === 0 || !activeViewerItem) return;
+  const file = input.files[0];
 
-  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
-  if (window.utils) window.utils.showToast(isAr ? 'جاري ضغط ومعالجة الصورة الجديدة...' : 'Optimizing new image...', 'info');
+  if (window.utils) window.utils.showToast('جاري معالجة وضغط الصورة الجديدة...', 'info');
 
   try {
     let compressedDataUrl = '';
     if (window.utils && window.utils.compressImage) {
-      compressedDataUrl = await window.utils.compressImage(file, 1400, 0.82);
+      compressedDataUrl = await window.utils.compressImage(file, 1200, 0.8);
     } else {
       compressedDataUrl = await new Promise((res, rej) => {
         const reader = new FileReader();
-        reader.onload = () => res(reader.result);
+        reader.onload = e => res(e.target.result);
         reader.onerror = rej;
         reader.readAsDataURL(file);
       });
     }
 
-    const imgEl = document.getElementById('viewer-img-element');
-    if (imgEl) imgEl.src = compressedDataUrl;
+    let thumbDataUrl = '';
+    if (window.utils && window.utils.compressImage) {
+      thumbDataUrl = await window.utils.compressImage(file, 120, 0.6);
+    }
 
-    activeViewerItem.pendingNewImage = compressedDataUrl;
-    activeViewerItem.pendingNewImageSize = Math.round(compressedDataUrl.length * 0.75);
+    activeViewerItem._newImageFilePath = compressedDataUrl;
+    activeViewerItem._newThumbnail = thumbDataUrl || compressedDataUrl;
+    activeViewerItem._newImageFileSize = Math.round(compressedDataUrl.length * 0.75);
 
-    const sizeEl = document.getElementById('viewer-meta-size');
-    if (sizeEl) sizeEl.textContent = window.utils ? window.utils.formatBytes(activeViewerItem.pendingNewImageSize) : 'New Image';
+    // Update modal preview image immediately
+    const imgEl = document.querySelector('#viewer-body-content img');
+    if (imgEl) {
+      imgEl.src = compressedDataUrl;
+    }
+
+    // Highlight save button
+    const saveBtn = document.getElementById('viewer-save-btn');
+    if (saveBtn) {
+      saveBtn.style.animation = 'pulse 1s infinite alternate';
+    }
 
     if (window.utils) {
-      window.utils.showToast(isAr ? 'تم تحديد الصورة الجديدة! اضغط "حفظ التعديلات" لتثبيتها 💾' : 'New image chosen! Click Save Changes to apply 💾');
+      window.utils.showToast('تم تجهيز الصورة الجديدة! اضغط على "حفظ التعديلات" لتطبيقها 💾');
     }
-  } catch (err) {
-    if (window.utils) window.utils.showToast(err.message, 'warning');
+  } catch (e) {
+    if (window.utils) window.utils.showToast('فشل تجهيز الصورة: ' + e.message, 'warning');
   }
 }
 
@@ -479,7 +482,7 @@ window.copyViewerText = copyViewerText;
 window.copyViewerNotes = copyViewerNotes;
 window.copyViewerCombined = copyViewerCombined;
 window.saveViewerItemChanges = saveViewerItemChanges;
-window.handleViewerReplaceImage = handleViewerReplaceImage;
+window.handleViewerImageReplace = handleViewerImageReplace;
 window.toggleViewerFavorite = toggleViewerFavorite;
 window.deleteViewerItem = deleteViewerItem;
 window.openViewerShare = openViewerShare;

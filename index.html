@@ -444,12 +444,15 @@
   <!-- 2. ITEM VIEWER & EDITOR MODAL -->
   <div id="viewer-modal" class="modal-overlay">
     <div class="modal-container large">
-      <div class="modal-header">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <h3 class="modal-title" id="viewer-title">Item Details</h3>
-          <span style="font-size:0.75rem; color:var(--text-muted);" id="viewer-meta-size"></span>
+      <div class="modal-header" style="flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:240px;">
+          <input type="text" id="viewer-title-input" class="viewer-title-input" placeholder="عنوان العنصر..." title="اضغط لتعديل العنوان" style="font-size:1.0625rem; font-weight:750; color:var(--text-primary); background:var(--bg-surface-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:6px 12px; width:100%; transition:all var(--spring);" />
+          <span style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;" id="viewer-meta-size"></span>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn-primary" id="viewer-save-btn" onclick="saveViewerItemChanges(this)" style="height:34px; font-size:0.8125rem; padding:0 14px; gap:6px;">
+            <span class="btn-label">💾 حفظ التعديلات</span>
+          </button>
           <button class="btn-card-action" id="viewer-fav-btn" onclick="toggleViewerFavorite()">☆ Favorite</button>
           <button class="btn-card-action" onclick="openViewerShare()">Share</button>
           <button class="modal-close-btn" onclick="closeItemViewer()">✕</button>
@@ -458,19 +461,18 @@
       <div class="modal-body" id="viewer-body-content">
         <!-- Rendered based on type -->
       </div>
-      <div class="modal-footer" style="justify-content:space-between; flex-wrap:wrap; gap:10px;">
-        <div style="font-size:0.75rem; color:var(--text-muted); display:flex; gap:10px; align-items:center;">
+      <div class="modal-footer" style="justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div style="font-size:0.75rem; color:var(--text-muted); display:flex; gap:12px; align-items:center;">
           <span>Added from <b id="viewer-meta-device">iPad</b></span>
           <span>•</span>
           <span id="viewer-meta-time">2:14 PM</span>
-          <span id="viewer-save-status-indicator" style="font-weight:600; margin-inline-start:6px;"></span>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn-primary" onclick="saveViewerItemChanges(document.getElementById('viewer-save-btn'))" style="height:32px; font-size:0.8125rem; padding:0 12px;">
+            💾 حفظ التعديلات
+          </button>
           <button class="btn-card-action" style="color:var(--danger);" onclick="deleteViewerItem()">
             Move to Trash
-          </button>
-          <button class="btn-primary" id="viewer-save-btn" onclick="saveViewerItemChanges()" style="padding-inline:18px; font-weight:700;">
-            💾 حفظ التعديلات
           </button>
         </div>
       </div>
