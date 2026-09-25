@@ -53,10 +53,12 @@ function renderItemCard(item, currentView = 'all') {
   // Snippet / Meta string
   let snippet = '';
   if (item.content) {
-    snippet = `<div class="card-snippet">${escapeHtml(item.content.replace(/\n/g, ' '))}</div>`;
-  } else if (item.file_size) {
+    snippet += `<div class="card-snippet" title="${escapeHtml(item.content)}">${escapeHtml(item.content.replace(/\n/g, ' '))}</div>`;
+  }
+  if (item.file_size || item.type === 'file' || item.type === 'image') {
     const ext = item.file_name ? item.file_name.split('.').pop().toUpperCase() : item.type.toUpperCase();
-    snippet = `<div class="card-meta-line"><span class="meta-pill">${window.utils.formatBytes(item.file_size)}</span> <span>•</span> <span>${ext}</span></div>`;
+    const sizeStr = item.file_size ? window.utils.formatBytes(item.file_size) : '';
+    snippet += `<div class="card-meta-line" style="${item.content ? 'margin-top:4px;' : ''}">${sizeStr ? `<span class="meta-pill">${sizeStr}</span> <span>•</span> ` : ''}<span>${ext}</span></div>`;
   }
 
   // Favorite Star

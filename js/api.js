@@ -548,23 +548,30 @@ const api = {
     });
   },
 
-  async uploadFile(file, folderId = null, force = false) {
+  async uploadFile(file, folderId = null, force = false, extraData = {}) {
     if (this.isStaticHost) {
       // Store local base64 or upload to Supabase
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = async () => {
           const isImg = file.type.startsWith('image/');
+          const title = (extraData && extraData.title) ? extraData.title : file.name;
+          const content = (extraData && extraData.content) ? extraData.content : '';
+          const isFavorite = (extraData && extraData.is_favorite) ? 1 : 0;
+
           const newItem = {
             id: 'upload-' + Date.now(),
             type: isImg ? 'image' : 'file',
-            title: file.name,
+            title,
+            content,
             file_name: file.name,
             file_path: reader.result,
             file_size: file.size,
             mime_type: file.type,
-            device_name: 'Web Device',
-            device_type: 'laptop',
+            folder_id: folderId,
+            is_favorite: isFavorite,
+            device_name: window.KuroSupabase ? window.KuroSupabase.detectDeviceName() : 'Web Device',
+            device_type: window.KuroSupabase ? window.KuroSupabase.detectDeviceType() : 'laptop',
             created_at: new Date().toISOString(),
             deleted_at: null
           };
@@ -591,6 +598,9 @@ const api = {
     const formData = new FormData();
     formData.append('file', file);
     if (folderId) formData.append('folder_id', folderId);
+    if (extraData && extraData.title) formData.append('title', extraData.title);
+    if (extraData && extraData.content) formData.append('content', extraData.content);
+    if (extraData && extraData.is_favorite) formData.append('is_favorite', extraData.is_favorite ? '1' : '0');
 
     const token = this.getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};

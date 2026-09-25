@@ -64,6 +64,11 @@ function setImageFile(file) {
   const previewContainer = document.getElementById('image-selection-preview');
   const imgEl = document.getElementById('image-preview-img');
   const infoEl = document.getElementById('image-selection-info');
+  const titleInput = document.getElementById('new-image-title');
+
+  if (titleInput && !titleInput.value.trim()) {
+    titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+  }
 
   if (previewContainer && imgEl) {
     const reader = new FileReader();
@@ -82,6 +87,12 @@ function setImageFile(file) {
 function setDocumentFile(file) {
   currentModalFile = file;
   const infoEl = document.getElementById('file-selection-info');
+  const titleInput = document.getElementById('new-file-title');
+
+  if (titleInput && !titleInput.value.trim()) {
+    titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+  }
+
   if (infoEl) {
     infoEl.style.display = 'block';
     infoEl.innerHTML = `📄 <b>${escapeHtml(file.name)}</b> <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">(${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})</span>`;
@@ -215,7 +226,11 @@ function resetNewForm() {
   const linkUrl = document.getElementById('new-link-url');
   const linkTitle = document.getElementById('new-link-title');
   const fileInput = document.getElementById('new-file-input');
+  const fileTitle = document.getElementById('new-file-title');
+  const fileNotes = document.getElementById('new-file-notes');
   const imageInput = document.getElementById('new-image-input');
+  const imageTitle = document.getElementById('new-image-title');
+  const imageNotes = document.getElementById('new-image-notes');
   const clipboardPreview = document.getElementById('clipboard-preview-content');
   const fileInfo = document.getElementById('file-selection-info');
   const imgPreview = document.getElementById('image-selection-preview');
@@ -225,7 +240,11 @@ function resetNewForm() {
   if (linkUrl) linkUrl.value = '';
   if (linkTitle) linkTitle.value = '';
   if (fileInput) fileInput.value = '';
+  if (fileTitle) fileTitle.value = '';
+  if (fileNotes) fileNotes.value = '';
   if (imageInput) imageInput.value = '';
+  if (imageTitle) imageTitle.value = '';
+  if (imageNotes) imageNotes.value = '';
   if (fileInfo) fileInfo.style.display = 'none';
   if (imgPreview) imgPreview.style.display = 'none';
   if (clipboardPreview) clipboardPreview.textContent = 'Click "Read Clipboard" to load content';
@@ -295,8 +314,13 @@ async function submitNewItem() {
         return;
       }
 
+      const fileTitleInput = document.getElementById('new-file-title');
+      const fileNotesInput = document.getElementById('new-file-notes');
+      const title = (fileTitleInput && fileTitleInput.value.trim()) ? fileTitleInput.value.trim() : file.name;
+      const content = (fileNotesInput && fileNotesInput.value.trim()) ? fileNotesInput.value.trim() : '';
+
       if (window.utils) window.utils.showToast(`Uploading ${file.name}...`, 'info');
-      await window.api.uploadFile(file, folderId);
+      await window.api.uploadFile(file, folderId, false, { title, content, is_favorite: isFavorite });
       if (window.utils) window.utils.showToast('File uploaded & synced!');
       closeNewModal();
       window.refreshItems();
@@ -308,8 +332,13 @@ async function submitNewItem() {
         return;
       }
 
+      const imageTitleInput = document.getElementById('new-image-title');
+      const imageNotesInput = document.getElementById('new-image-notes');
+      const title = (imageTitleInput && imageTitleInput.value.trim()) ? imageTitleInput.value.trim() : file.name;
+      const content = (imageNotesInput && imageNotesInput.value.trim()) ? imageNotesInput.value.trim() : '';
+
       if (window.utils) window.utils.showToast(`Uploading ${file.name}...`, 'info');
-      await window.api.uploadFile(file, folderId);
+      await window.api.uploadFile(file, folderId, false, { title, content, is_favorite: isFavorite });
       if (window.utils) window.utils.showToast('Image uploaded & synced!');
       closeNewModal();
       window.refreshItems();

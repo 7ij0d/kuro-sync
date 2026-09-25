@@ -219,19 +219,21 @@ router.post('/items/upload', authMiddleware, upload.single('file'), async (req, 
     const isImage = file.mimetype.startsWith('image/');
     const type = isImage ? 'image' : 'file';
     const title = req.body.title || file.originalname;
+    const content = req.body.content || null;
+    const isFavorite = req.body.is_favorite === '1' || req.body.is_favorite === 1 ? 1 : 0;
     const itemId = crypto.randomUUID();
     const sourceDeviceId = req.user.deviceId || null;
     const folderId = req.body.folder_id || null;
 
     db.prepare(`
       INSERT INTO items (
-        id, user_id, type, title, file_path, file_name, mime_type, file_size, 
-        content_hash, source_device_id, folder_id
+        id, user_id, type, title, content, file_path, file_name, mime_type, file_size, 
+        content_hash, source_device_id, folder_id, is_favorite
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      itemId, userId, type, title, file.path, file.originalname, file.mimetype, file.size,
-      contentHash, sourceDeviceId, folderId
+      itemId, userId, type, title, content, file.path, file.originalname, file.mimetype, file.size,
+      contentHash, sourceDeviceId, folderId, isFavorite
     );
 
     // Update user storage used
