@@ -260,6 +260,11 @@
 
           <!-- Top-Right Actions -->
           <div class="header-actions">
+            <!-- Cloud Supabase Indicator & Button -->
+            <button class="btn-card-action" id="btn-cloud-status" style="height:32px; font-size:0.75rem; gap:6px;" onclick="openCloudModal()" title="إعدادات الربط السحابي Supabase Cloud">
+              <span>☁️ سوبابيز</span>
+            </button>
+
             <!-- Realtime Sync Indicator -->
             <div class="sync-indicator-pill" id="realtime-indicator" title="Cross-Device Synchronization State">
               <span class="pulse-dot" id="realtime-pulse-dot"></span>
@@ -565,10 +570,64 @@
     </div>
   </div>
 
+  <!-- 7. SUPABASE CLOUD SYNC MODAL -->
+  <div id="cloud-modal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 540px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.25rem;">☁️</span>
+          <h3 class="modal-title">الربط السحابي (Supabase Cloud)</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeCloudModal()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+        <div style="font-size:0.875rem; color:var(--text-secondary); line-height:1.6;">
+          اربط منصة <b>Kuro Sync</b> بمشروع <b>Supabase</b> لتُحفظ كل الملاحظات، الملفات، والصور في قاعدة بيانات سحابية موحدة وتظهر فوراً لأي شخص أو أي جهاز يفتح الرابط.
+        </div>
+
+        <div id="cloud-conn-status" style="padding:10px 14px; background:var(--bg-surface-subtle); border-radius:var(--radius-md); border:1px solid var(--border-subtle);"></div>
+
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:0.8125rem; font-weight:700; color:var(--text-primary);">Supabase Project URL</label>
+          <input type="url" id="cloud-sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" style="width:100%; height:40px; padding:0 12px; font-family:monospace; font-size:0.875rem;" />
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-size:0.8125rem; font-weight:700; color:var(--text-primary);">Supabase Anon Public Key</label>
+          <textarea id="cloud-sb-key" rows="2" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width:100%; padding:8px 12px; font-family:monospace; font-size:0.75rem; resize:vertical;"></textarea>
+        </div>
+
+        <!-- Schema Helper Box -->
+        <div style="background:var(--bg-surface-subtle); padding:12px; border-radius:var(--radius-md); border:1px dashed var(--border-subtle); display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:0.8125rem; font-weight:700;">جدول البيانات المطلوب (SQL):</span>
+            <button type="button" class="btn-secondary" style="font-size:0.75rem; height:26px; padding:0 8px;" onclick="copySupabaseSql()">📋 نسخ كود SQL</button>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+            انسخ الكود والصقه في لوحة تحكم <b>Supabase Dashboard -> SQL Editor</b> واضغط <b>Run</b> لإنشاء جدول <code>items</code> وتفعيل القراءة والكتابة العامة.
+          </div>
+        </div>
+
+        <!-- Action Links -->
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button type="button" class="btn-secondary" style="width:100%; height:36px; justify-content:center; font-size:0.8125rem; gap:6px;" onclick="copySharedLinkWithKeys()">
+            🔗 نسخ الرابط المشترك مع المفاتيح (لفتحه مباشرة من الآيباد أو الهاتف)
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between;">
+        <button class="btn-secondary" onclick="closeCloudModal()">إغلاق</button>
+        <button class="btn-primary" id="cloud-save-btn" onclick="saveCloudConfig()">حفظ وتفعيل السحابة</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
   <!-- Scripts -->
+  <script src="./js/config.js"></script>
+  <script src="./js/supabaseClient.js"></script>
   <script src="./js/i18n.js"></script>
   <script src="./js/utils.js"></script>
   <script src="./js/api.js"></script>
@@ -582,6 +641,7 @@
   <script src="./js/components/storageModal.js"></script>
   <script src="./js/components/shareModal.js"></script>
   <script src="./js/components/authModal.js"></script>
+  <script src="./js/components/cloudModal.js"></script>
   <script src="./js/components/sidebar.js"></script>
   <script src="./js/components/header.js"></script>
   <script src="./js/app.js"></script>

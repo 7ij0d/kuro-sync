@@ -217,6 +217,9 @@ const api = {
     if (pathname.includes('/permanent') && method === 'DELETE') {
       const match = pathname.match(/\/items\/([^/]+)\/permanent/);
       const id = match ? match[1] : pathname.split('/').filter(Boolean).slice(-2)[0];
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+        try { return await window.KuroSupabase.permanentDeleteItem(id); } catch (e) { console.warn('Supabase permanent delete error:', e); }
+      }
       let items = LocalKuroStore.getItems();
       items = items.filter(i => String(i.id) !== String(id));
       LocalKuroStore.saveItems(items);
@@ -225,6 +228,9 @@ const api = {
 
     // 6. Empty Trash: POST .../trash/empty
     if (pathname.includes('/trash/empty') && method === 'POST') {
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+        try { return await window.KuroSupabase.emptyTrash(); } catch (e) { console.warn('Supabase empty trash error:', e); }
+      }
       let items = LocalKuroStore.getItems();
       items = items.filter(i => !i.deleted_at);
       LocalKuroStore.saveItems(items);
@@ -235,6 +241,9 @@ const api = {
     if (pathname.includes('/restore') && method === 'POST') {
       const match = pathname.match(/\/items\/([^/]+)\/restore/);
       const id = match ? match[1] : null;
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured() && id) {
+        try { return await window.KuroSupabase.restoreItem(id); } catch (e) { console.warn('Supabase restore error:', e); }
+      }
       if (id) {
         const items = LocalKuroStore.getItems();
         const item = items.find(i => String(i.id) === String(id));
@@ -248,6 +257,9 @@ const api = {
     if (method === 'DELETE' && pathname.includes('/items/')) {
       const match = pathname.match(/\/items\/([^/]+)$/);
       const id = match ? match[1] : pathname.split('/').filter(Boolean).pop();
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured() && id) {
+        try { return await window.KuroSupabase.deleteItem(id); } catch (e) { console.warn('Supabase delete error:', e); }
+      }
       const items = LocalKuroStore.getItems();
       const item = items.find(i => String(i.id) === String(id));
       if (item) {
@@ -265,6 +277,9 @@ const api = {
       const match = pathname.match(/\/items\/([^/]+)$/);
       const id = match ? match[1] : pathname.split('/').filter(Boolean).pop();
       const body = JSON.parse(options.body || '{}');
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured() && id) {
+        try { return await window.KuroSupabase.updateItem(id, body); } catch (e) { console.warn('Supabase update error:', e); }
+      }
       const items = LocalKuroStore.getItems();
       const item = items.find(i => String(i.id) === String(id));
       if (item) {
@@ -278,6 +293,15 @@ const api = {
 
     // 10. Items List: GET .../items
     if (pathname.includes('/items') && method === 'GET') {
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+        try {
+          const params = Object.fromEntries(u.searchParams.entries());
+          return await window.KuroSupabase.getItems(params);
+        } catch (e) {
+          console.warn('Supabase getItems fallback to local:', e);
+        }
+      }
+
       const items = LocalKuroStore.getItems();
       const trash = u.searchParams.get('trash') === '1';
       const type = u.searchParams.get('type');
@@ -320,6 +344,14 @@ const api = {
     // 11. Text / Note Create: POST .../items/text
     if (pathname.includes('/items/text') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+        try {
+          return await window.KuroSupabase.createItem(body);
+        } catch (e) {
+          console.warn('Supabase createTextItem fallback to local:', e);
+        }
+      }
+
       const newItem = {
         id: 'item-' + Date.now(),
         type: body.type || 'text',
@@ -340,6 +372,19 @@ const api = {
     // 12. Save Link: POST .../items/link
     if (pathname.includes('/items/link') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+        try {
+          return await window.KuroSupabase.createItem({
+            type: 'link',
+            title: body.title || body.url,
+            content: body.url,
+            is_favorite: body.is_favorite ? 1 : 0
+          });
+        } catch (e) {
+          console.warn('Supabase saveLink fallback to local:', e);
+        }
+      }
+
       const newItem = {
         id: 'link-' + Date.now(),
         type: 'link',
@@ -505,10 +550,10 @@ const api = {
 
   async uploadFile(file, folderId = null, force = false) {
     if (this.isStaticHost) {
-      // Store local base64 on GitHub Pages
+      // Store local base64 or upload to Supabase
       return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = async () => {
           const isImg = file.type.startsWith('image/');
           const newItem = {
             id: 'upload-' + Date.now(),
@@ -517,11 +562,23 @@ const api = {
             file_name: file.name,
             file_path: reader.result,
             file_size: file.size,
-            device_name: 'iPad Pro',
-            device_type: 'ipad',
+            mime_type: file.type,
+            device_name: 'Web Device',
+            device_type: 'laptop',
             created_at: new Date().toISOString(),
             deleted_at: null
           };
+
+          if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+            try {
+              const res = await window.KuroSupabase.createItem(newItem);
+              resolve(res);
+              return;
+            } catch (e) {
+              console.warn('Supabase upload fallback:', e);
+            }
+          }
+
           const items = LocalKuroStore.getItems();
           items.unshift(newItem);
           LocalKuroStore.saveItems(items);
