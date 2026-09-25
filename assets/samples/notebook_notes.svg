@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <!-- Vintage warm ivory notebook paper -->
+  <rect width="400" height="300" fill="#E8DEC8"/>
+  <!-- Ruled horizontal lines -->
+  <line x1="20" y1="50" x2="380" y2="50" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="80" x2="380" y2="80" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="110" x2="380" y2="110" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="140" x2="380" y2="140" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="170" x2="380" y2="170" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="200" x2="380" y2="200" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="230" x2="380" y2="230" stroke="#C2B79E" stroke-width="1.5"/>
+  <line x1="20" y1="260" x2="380" y2="260" stroke="#C2B79E" stroke-width="1.5"/>
+  <!-- Red vertical margin line -->
+  <line x1="70" y1="0" x2="70" y2="300" stroke="#D99B9B" stroke-width="1.5" opacity="0.6"/>
+  <!-- Handwritten notes text simulation -->
+  <text x="85" y="45" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="bold" fill="#3D342A">Endodontic Access Principles:</text>
+  <text x="85" y="75" font-family="'Courier New', Courier, monospace" font-size="12" fill="#4A4135">1. Outline form based on pulp chamber anatomy</text>
+  <text x="85" y="105" font-family="'Courier New', Courier, monospace" font-size="12" fill="#4A4135">2. Removal of all coronal pulp roof</text>
+  <text x="85" y="135" font-family="'Courier New', Courier, monospace" font-size="12" fill="#4A4135">3. Straight-line access to apical foramina</text>
+  <text x="85" y="165" font-family="'Courier New', Courier, monospace" font-size="12" fill="#4A4135">4. Conservation of remaining tooth structure</text>
+  <text x="85" y="195" font-family="'Courier New', Courier, monospace" font-size="12" fill="#4A4135">5. Ultrasonic irrigation &amp; NaOCl 2.5% protocol</text>
+  <text x="85" y="225" font-family="'Courier New', Courier, monospace" font-size="11" fill="#756957">Important: Verify MB2 canal under microscope</text>
+</svg>
