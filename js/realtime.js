@@ -1,5 +1,5 @@
 // ==========================================================
-// KURO SYNC CLIENT REALTIME ENGINE
+// KURO SYNC CLIENT REALTIME & CLOUD SYNC ENGINE
 // ==========================================================
 
 class RealtimeClient {
@@ -7,10 +7,20 @@ class RealtimeClient {
     this.ws = null;
     this.reconnectTimer = null;
     this.heartbeatTimer = null;
+    this.pollTimer = null;
+    this._focusBound = false;
     this.status = 'offline'; // 'synced', 'syncing', 'offline'
   }
 
   connect() {
+    // 1. Supabase Cloud Sync Mode (Active on GitHub Pages and Live Deployments)
+    if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+      this.setStatus('synced');
+      this.startSupabasePoller();
+      return;
+    }
+
+    // 2. Node.js WebSocket Mode (when running local Node server)
     const token = window.api ? window.api.getToken() : null;
     const deviceId = window.api ? window.api.getDeviceId() : null;
 
@@ -58,6 +68,34 @@ class RealtimeClient {
     }
   }
 
+  startSupabasePoller() {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+
+    if (!this._focusBound) {
+      this._focusBound = true;
+      window.addEventListener('focus', () => {
+        if (typeof window.refreshItems === 'function') window.refreshItems();
+      });
+      window.addEventListener('online', () => {
+        this.setStatus('synced');
+        if (typeof window.refreshItems === 'function') window.refreshItems();
+      });
+      window.addEventListener('offline', () => {
+        this.setStatus('offline');
+      });
+    }
+
+    // Cross-device synchronization interval (6 seconds)
+    this.pollTimer = setInterval(async () => {
+      if (document.hidden) return; // Do not waste bandwidth if tab in background
+      if (typeof window.refreshItems === 'function') {
+        try {
+          await window.refreshItems();
+        } catch (e) {}
+      }
+    }, 6000);
+  }
+
   handleEvent(event) {
     // Briefly show "syncing..." dot then back to "synced"
     this.setStatus('syncing');
@@ -75,17 +113,18 @@ class RealtimeClient {
 
     if (!indicator || !indicatorText || !dot) return;
 
-    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
 
     dot.className = 'pulse-dot';
     if (newStatus === 'synced') {
-      indicatorText.textContent = t('syncedAll');
+      const isCloud = window.KuroSupabase && window.KuroSupabase.isConfigured();
+      indicatorText.textContent = isCloud ? (isAr ? 'سحابة كورو موثقة ☁️' : 'Kuro Cloud Synced ☁️') : (isAr ? 'متزامن مع كل الأجهزة' : 'Synced Across All');
     } else if (newStatus === 'syncing') {
       dot.classList.add('syncing');
-      indicatorText.textContent = t('syncing');
+      indicatorText.textContent = isAr ? 'جاري المزامنة...' : 'Syncing...';
     } else {
       dot.classList.add('offline');
-      indicatorText.textContent = t('offline');
+      indicatorText.textContent = isAr ? 'غير متصل' : 'Offline';
     }
   }
 
@@ -117,6 +156,10 @@ class RealtimeClient {
 
   disconnect() {
     this.stopHeartbeat();
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

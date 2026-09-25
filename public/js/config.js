@@ -1,12 +1,9 @@
 // ==========================================================
 // KURO SYNC GLOBAL CONFIGURATION
-// To share items with anyone who visits the link:
-// Put your Supabase URL & Anon Key here, or configure them via the in-app UI.
+// Pre-configured with Kuro Fangs live Supabase project
 // ==========================================================
 
 window.KURO_CONFIG = {
-  // Example: 'https://waixuduxzgdmnodfqyii.supabase.co'
-  SUPABASE_URL: '',
-  // Example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-  SUPABASE_ANON_KEY: ''
+  SUPABASE_URL: 'https://vqrpodmnzubpcsvqohwj.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_bISG70YeoKP4mu8BKlgsuQ_xPprjcc1'
 };
