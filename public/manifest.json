@@ -1,0 +1,18 @@
+{
+  "name": "Kuro Sync — Cross-Device Content Platform",
+  "short_name": "Kuro Sync",
+  "description": "Your universal clipboard, files, images and notes shelf across all devices.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#7D1D2D",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/kuro-mascot.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
