@@ -458,15 +458,21 @@
       <div class="modal-body" id="viewer-body-content">
         <!-- Rendered based on type -->
       </div>
-      <div class="modal-footer" style="justify-content:space-between;">
-        <div style="font-size:0.75rem; color:var(--text-muted); display:flex; gap:12px;">
+      <div class="modal-footer" style="justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div style="font-size:0.75rem; color:var(--text-muted); display:flex; gap:10px; align-items:center;">
           <span>Added from <b id="viewer-meta-device">iPad</b></span>
           <span>•</span>
           <span id="viewer-meta-time">2:14 PM</span>
+          <span id="viewer-save-status-indicator" style="font-weight:600; margin-inline-start:6px;"></span>
         </div>
-        <button class="btn-card-action" style="color:var(--danger);" onclick="deleteViewerItem()">
-          Move to Trash
-        </button>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn-card-action" style="color:var(--danger);" onclick="deleteViewerItem()">
+            Move to Trash
+          </button>
+          <button class="btn-primary" id="viewer-save-btn" onclick="saveViewerItemChanges()" style="padding-inline:18px; font-weight:700;">
+            💾 حفظ التعديلات
+          </button>
+        </div>
       </div>
     </div>
   </div>

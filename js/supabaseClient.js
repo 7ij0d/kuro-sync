@@ -203,12 +203,19 @@ const KuroSupabase = {
     return { success: true, item: payload };
   },
 
-  // 3. Update Item
+  // 3. Update Item (Optimized single round-trip with instant optimistic cache update)
   async updateItem(id, updates) {
-    const rows = await this.request(`/settings?key=eq.ks_item_${encodeURIComponent(id)}&select=value`);
-    let current = {};
-    if (Array.isArray(rows) && rows.length > 0) {
-      current = rows[0].value || {};
+    let current = (window.currentItems || []).find(i => String(i.id) === String(id));
+    if (!current) {
+      const cached = this.getCachedItems() || [];
+      current = cached.find(i => String(i.id) === String(id)) || {};
+    }
+
+    if (!current || !current.id) {
+      try {
+        const rows = await this.request(`/settings?key=eq.ks_item_${encodeURIComponent(id)}&select=value`);
+        if (Array.isArray(rows) && rows.length > 0) current = rows[0].value || {};
+      } catch (e) {}
     }
 
     const merged = {
@@ -217,9 +224,19 @@ const KuroSupabase = {
       updated_at: new Date().toISOString()
     };
 
+    // Instant local cache update (0ms latency!)
+    try {
+      const cached = this.getCachedItems() || [];
+      const idx = cached.findIndex(i => String(i.id) === String(id));
+      if (idx !== -1) cached[idx] = merged;
+      else cached.unshift(merged);
+      this.setCachedItems(cached);
+    } catch (e) {}
+
+    // Direct PATCH to Supabase
     await this.request(`/settings?key=eq.ks_item_${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      headers: { 'Prefer': 'return=representation' },
+      headers: { 'Prefer': 'return=minimal' },
       body: JSON.stringify({ value: merged })
     });
 
