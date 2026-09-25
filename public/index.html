@@ -330,11 +330,11 @@
     <div class="modal-container">
       <div class="modal-header">
         <div style="display:flex; gap:8px; overflow-x:auto;">
-          <button class="filter-pill modal-tab-btn active" data-tab="text" onclick="switchNewTab('text')">Text</button>
-          <button class="filter-pill modal-tab-btn" data-tab="clipboard" onclick="switchNewTab('clipboard')">Clipboard</button>
-          <button class="filter-pill modal-tab-btn" data-tab="file" onclick="switchNewTab('file')">Upload File</button>
-          <button class="filter-pill modal-tab-btn" data-tab="image" onclick="switchNewTab('image')">Image</button>
-          <button class="filter-pill modal-tab-btn" data-tab="link" onclick="switchNewTab('link')">Link</button>
+          <button class="modal-tab-btn active" data-tab="text" onclick="switchNewTab('text')">Text</button>
+          <button class="modal-tab-btn" data-tab="clipboard" onclick="switchNewTab('clipboard')">Clipboard</button>
+          <button class="modal-tab-btn" data-tab="file" onclick="switchNewTab('file')">Upload File</button>
+          <button class="modal-tab-btn" data-tab="image" onclick="switchNewTab('image')">Image</button>
+          <button class="modal-tab-btn" data-tab="link" onclick="switchNewTab('link')">Link</button>
         </div>
         <button class="modal-close-btn" onclick="closeNewModal()">✕</button>
       </div>
@@ -347,7 +347,7 @@
         </div>
 
         <!-- Clipboard Pane -->
-        <div id="tab-pane-clipboard" class="tab-content-pane" style="display:none;">
+        <div id="tab-pane-clipboard" class="tab-content-pane">
           <div style="background:var(--bg-surface-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:16px; min-height:120px; font-family:var(--font-mono); font-size:0.875rem;" id="clipboard-preview-content">
             Click "Read Clipboard" to load content
           </div>
@@ -356,8 +356,8 @@
           </button>
         </div>
 
-        <!-- File & Image Upload Pane -->
-        <div id="tab-pane-file" class="tab-content-pane" style="display:none;">
+        <!-- File Upload Pane -->
+        <div id="tab-pane-file" class="tab-content-pane">
           <label class="dropzone-box" for="new-file-input">
             <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -366,11 +366,13 @@
             </svg>
             <div style="font-weight:600;" data-i18n="dropFilesHere">Drop files here, or browse</div>
             <div style="font-size:0.75rem; color:var(--text-muted);">PDF, Images, DOCX, PPTX, TXT up to 500 MB</div>
-            <input type="file" id="new-file-input" style="display:none;" />
+            <input type="file" id="new-file-input" style="display:none;" onchange="handleFileSelected(this, 'file')" />
           </label>
+          <div id="file-selection-info" style="display:none; margin-top:12px; padding:10px 14px; background:var(--bg-surface-subtle); border-radius:var(--radius-md); border:1px solid var(--border-subtle); font-size:0.875rem; font-weight:600;"></div>
         </div>
 
-        <div id="tab-pane-image" class="tab-content-pane" style="display:none;">
+        <!-- Image Upload Pane -->
+        <div id="tab-pane-image" class="tab-content-pane">
           <label class="dropzone-box" for="new-image-input">
             <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -378,12 +380,17 @@
               <polyline points="21 15 16 10 5 21"></polyline>
             </svg>
             <div style="font-weight:600;">Drop image or screenshot here</div>
-            <input type="file" id="new-image-input" accept="image/*" style="display:none;" onchange="document.getElementById('new-file-input').files = this.files;" />
+            <div style="font-size:0.75rem; color:var(--text-muted);">PNG, JPG, WEBP, SVG</div>
+            <input type="file" id="new-image-input" accept="image/*" style="display:none;" onchange="handleFileSelected(this, 'image')" />
           </label>
+          <div id="image-selection-preview" style="display:none; margin-top:12px; text-align:center;">
+            <img id="image-preview-img" style="max-height:160px; max-width:100%; border-radius:var(--radius-md); border:1px solid var(--border-subtle); object-fit:contain;" />
+            <div id="image-selection-info" style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;"></div>
+          </div>
         </div>
 
         <!-- Link Pane -->
-        <div id="tab-pane-link" class="tab-content-pane" style="display:none;">
+        <div id="tab-pane-link" class="tab-content-pane">
           <input type="url" id="new-link-url" placeholder="https://example.com/article" style="width:100%; height:40px; padding:0 12px; margin-bottom:12px;" />
           <input type="text" id="new-link-title" placeholder="Optional title" style="width:100%; height:40px; padding:0 12px;" />
         </div>

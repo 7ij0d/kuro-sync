@@ -21,9 +21,9 @@ function setupHeaderControls() {
   });
 
   // 2. Filter Pills
-  document.querySelectorAll('.filter-pill').forEach(pill => {
+  document.querySelectorAll('.header-filter-bar .filter-pill').forEach(pill => {
     pill.addEventListener('click', () => {
-      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.header-filter-bar .filter-pill').forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
 
       const filterType = pill.dataset.type;

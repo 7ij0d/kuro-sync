@@ -32,13 +32,58 @@ function closeNewModal() {
 
 function switchNewTab(tab) {
   currentNewTab = tab;
+
+  // Toggle active button
   document.querySelectorAll('.modal-tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
+  // Toggle pane visibility explicitly with style.display and class
   document.querySelectorAll('.tab-content-pane').forEach(pane => {
-    pane.classList.toggle('active', pane.id === `tab-pane-${tab}`);
+    const isTarget = pane.id === `tab-pane-${tab}`;
+    pane.classList.toggle('active', isTarget);
+    pane.style.display = isTarget ? 'block' : 'none';
   });
+
+  setTimeout(() => {
+    if (tab === 'text') {
+      const titleInput = document.getElementById('new-text-title');
+      if (titleInput) titleInput.focus();
+    } else if (tab === 'link') {
+      const linkInput = document.getElementById('new-link-url');
+      if (linkInput) linkInput.focus();
+    }
+  }, 50);
+}
+
+// Handle file/image selected from picker
+function handleFileSelected(input, type) {
+  const file = input && input.files ? input.files[0] : null;
+  if (!file) return;
+
+  if (type === 'file') {
+    const infoEl = document.getElementById('file-selection-info');
+    if (infoEl) {
+      infoEl.style.display = 'block';
+      infoEl.innerHTML = `📄 <b>${escapeHtml(file.name)}</b> <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">(${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})</span>`;
+    }
+  } else if (type === 'image') {
+    const previewContainer = document.getElementById('image-selection-preview');
+    const imgEl = document.getElementById('image-preview-img');
+    const infoEl = document.getElementById('image-selection-info');
+
+    if (previewContainer && imgEl) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        imgEl.src = e.target.result;
+        previewContainer.style.display = 'block';
+        if (infoEl) {
+          infoEl.textContent = `${file.name} (${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})`;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  }
 }
 
 function populateFolderSelect() {
@@ -62,13 +107,19 @@ function resetNewForm() {
   const linkUrl = document.getElementById('new-link-url');
   const linkTitle = document.getElementById('new-link-title');
   const fileInput = document.getElementById('new-file-input');
+  const imageInput = document.getElementById('new-image-input');
   const clipboardPreview = document.getElementById('clipboard-preview-content');
+  const fileInfo = document.getElementById('file-selection-info');
+  const imgPreview = document.getElementById('image-selection-preview');
 
   if (textTitle) textTitle.value = '';
   if (textContent) textContent.value = '';
   if (linkUrl) linkUrl.value = '';
   if (linkTitle) linkTitle.value = '';
   if (fileInput) fileInput.value = '';
+  if (imageInput) imageInput.value = '';
+  if (fileInfo) fileInfo.style.display = 'none';
+  if (imgPreview) imgPreview.style.display = 'none';
   if (clipboardPreview) clipboardPreview.textContent = 'Click "Read Clipboard" to load content';
 }
 
@@ -128,7 +179,7 @@ async function submitNewItem() {
       if (window.utils) window.utils.showToast('Link saved & synced!');
       closeNewModal();
       window.refreshItems();
-    } else if (currentNewTab === 'file' || currentNewTab === 'image') {
+    } else if (currentNewTab === 'file') {
       const fileInput = document.getElementById('new-file-input');
       const file = fileInput && fileInput.files ? fileInput.files[0] : null;
       if (!file) {
@@ -138,7 +189,20 @@ async function submitNewItem() {
 
       if (window.utils) window.utils.showToast(`Uploading ${file.name}...`, 'info');
       await window.api.uploadFile(file, folderId);
-      if (window.utils) window.utils.showToast('File uploaded & synced to all devices!');
+      if (window.utils) window.utils.showToast('File uploaded & synced!');
+      closeNewModal();
+      window.refreshItems();
+    } else if (currentNewTab === 'image') {
+      const imageInput = document.getElementById('new-image-input');
+      const file = imageInput && imageInput.files ? imageInput.files[0] : null;
+      if (!file) {
+        if (window.utils) window.utils.showToast('Please select an image to upload', 'warning');
+        return;
+      }
+
+      if (window.utils) window.utils.showToast(`Uploading ${file.name}...`, 'info');
+      await window.api.uploadFile(file, folderId);
+      if (window.utils) window.utils.showToast('Image uploaded & synced!');
       closeNewModal();
       window.refreshItems();
     }
@@ -154,7 +218,6 @@ async function submitNewItem() {
 // Handle Duplicate Dialog
 function handleDuplicateModal(existingItem, tab) {
   if (confirm(`This item already exists ("${existingItem.title}"). Do you want to keep both copies?`)) {
-    // Retry with force
     if (tab === 'text') {
       const title = document.getElementById('new-text-title').value;
       const content = document.getElementById('new-text-content').value;
@@ -162,8 +225,16 @@ function handleDuplicateModal(existingItem, tab) {
         closeNewModal();
         window.refreshItems();
       });
-    } else if (tab === 'file' || tab === 'image') {
+    } else if (tab === 'file') {
       const file = document.getElementById('new-file-input').files[0];
+      if (file) {
+        window.api.uploadFile(file, null, true).then(() => {
+          closeNewModal();
+          window.refreshItems();
+        });
+      }
+    } else if (tab === 'image') {
+      const file = document.getElementById('new-image-input').files[0];
       if (file) {
         window.api.uploadFile(file, null, true).then(() => {
           closeNewModal();
@@ -177,5 +248,6 @@ function handleDuplicateModal(existingItem, tab) {
 window.openNewModal = openNewModal;
 window.closeNewModal = closeNewModal;
 window.switchNewTab = switchNewTab;
+window.handleFileSelected = handleFileSelected;
 window.handleReadClipboardIntoModal = handleReadClipboardIntoModal;
 window.submitNewItem = submitNewItem;
