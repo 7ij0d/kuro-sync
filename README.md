@@ -2,6 +2,9 @@
 
 > **Universal clipboard, file shelf, image vault, and notes platform designed for instant cross-device transfer.**
 
+### 🌐 Live Published App:
+👉 **[https://7ij0d.github.io/kuro-sync/](https://7ij0d.github.io/kuro-sync/)**
+
 ---
 
 ## 🌟 Overview
