@@ -9,9 +9,17 @@ function renderItemCard(item, currentView = 'all') {
   // Media / Icon thumbnail box
   let mediaHtml = '';
   if (item.type === 'image') {
-    // If physical file exists or demo image
-    const imgUrl = item.file_path ? `/api/items/${item.id}/file` : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
-    mediaHtml = `<img src="${imgUrl}" alt="${item.title}" loading="lazy" />`;
+    let imgUrl = '';
+    if (item.file_path) {
+      if (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')) {
+        imgUrl = item.file_path;
+      } else {
+        imgUrl = `/api/items/${item.id}/file`;
+      }
+    } else {
+      imgUrl = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
+    }
+    mediaHtml = `<img src="${imgUrl}" alt="${escapeHtml(item.title)}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />`;
   } else if (item.type === 'file') {
     mediaHtml = `
       <div class="type-icon-pdf">

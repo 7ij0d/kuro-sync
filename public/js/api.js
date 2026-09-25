@@ -549,50 +549,68 @@ const api = {
   },
 
   async uploadFile(file, folderId = null, force = false, extraData = {}) {
-    if (this.isStaticHost) {
-      // Store local base64 or upload to Supabase
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const isImg = file.type.startsWith('image/');
-          const title = (extraData && extraData.title) ? extraData.title : file.name;
-          const content = (extraData && extraData.content) ? extraData.content : '';
-          const isFavorite = (extraData && extraData.is_favorite) ? 1 : 0;
+    if (this.isStaticHost || (window.KuroSupabase && window.KuroSupabase.isConfigured())) {
+      const isImg = file && file.type && file.type.startsWith('image/');
+      let processedPath = '';
+      let processedSize = file.size;
 
-          const newItem = {
-            id: 'upload-' + Date.now(),
-            type: isImg ? 'image' : 'file',
-            title,
-            content,
-            file_name: file.name,
-            file_path: reader.result,
-            file_size: file.size,
-            mime_type: file.type,
-            folder_id: folderId,
-            is_favorite: isFavorite,
-            device_name: window.KuroSupabase ? window.KuroSupabase.detectDeviceName() : 'Web Device',
-            device_type: window.KuroSupabase ? window.KuroSupabase.detectDeviceType() : 'laptop',
-            created_at: new Date().toISOString(),
-            deleted_at: null
-          };
+      if (isImg && window.compressImage) {
+        try {
+          const comp = await window.compressImage(file, 1400, 0.82);
+          processedPath = comp.dataUrl;
+          processedSize = comp.size || file.size;
+        } catch (e) {
+          console.warn('Image compression fallback:', e);
+        }
+      }
 
-          if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
-            try {
-              const res = await window.KuroSupabase.createItem(newItem);
-              resolve(res);
-              return;
-            } catch (e) {
-              console.warn('Supabase upload fallback:', e);
-            }
-          }
+      if (!processedPath) {
+        processedPath = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+        });
+      }
 
-          const items = LocalKuroStore.getItems();
-          items.unshift(newItem);
-          LocalKuroStore.saveItems(items);
-          resolve({ success: true, item: newItem });
-        };
-        reader.readAsDataURL(file);
-      });
+      const title = (extraData && extraData.title) ? extraData.title : file.name;
+      const content = (extraData && extraData.content) ? extraData.content : '';
+      const isFavorite = (extraData && extraData.is_favorite) ? 1 : 0;
+
+      const newItem = {
+        id: 'upload-' + Date.now(),
+        type: isImg ? 'image' : 'file',
+        title,
+        content,
+        file_name: file.name,
+        file_path: processedPath,
+        file_size: processedSize,
+        mime_type: file.type || (isImg ? 'image/jpeg' : 'application/octet-stream'),
+        folder_id: folderId,
+        is_favorite: isFavorite,
+        device_name: window.KuroSupabase ? window.KuroSupabase.detectDeviceName() : 'Web Device',
+        device_type: window.KuroSupabase ? window.KuroSupabase.detectDeviceType() : 'laptop',
+        created_at: new Date().toISOString(),
+        deleted_at: null
+      };
+
+      if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+        try {
+          const res = await window.KuroSupabase.createItem(newItem);
+          return res;
+        } catch (e) {
+          console.warn('Supabase upload fallback to local:', e);
+        }
+      }
+
+      try {
+        const items = LocalKuroStore.getItems();
+        items.unshift(newItem);
+        LocalKuroStore.saveItems(items);
+      } catch (err) {
+        console.warn('LocalStorage save quota note:', err);
+      }
+      return { success: true, item: newItem };
     }
 
     const formData = new FormData();

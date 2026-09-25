@@ -118,7 +118,55 @@ const utils = {
         <line x1="2" y1="20" x2="22" y2="20"></line>
       </svg>`;
     }
+  },
+
+  // Compress and resize images client-side for lightning-fast cloud sync
+  compressImage(file, maxWidth = 1400, quality = 0.82) {
+    return new Promise((resolve) => {
+      if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ dataUrl: reader.result, size: file ? file.size : 0 });
+        reader.onerror = () => resolve({ dataUrl: '', size: 0 });
+        if (file) reader.readAsDataURL(file);
+        else resolve({ dataUrl: '', size: 0 });
+        return;
+      }
+
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxWidth) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxWidth) / height);
+              height = maxWidth;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const compressedSize = Math.round((dataUrl.length - 23) * 0.75);
+          resolve({ dataUrl, size: compressedSize });
+        };
+        img.onerror = () => resolve({ dataUrl: e.target.result, size: file.size });
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve({ dataUrl: '', size: 0 });
+      reader.readAsDataURL(file);
+    });
   }
 };
 
 window.utils = utils;
+window.compressImage = utils.compressImage;

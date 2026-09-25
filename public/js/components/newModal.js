@@ -266,6 +266,15 @@ async function handleReadClipboardIntoModal() {
 
 // Submit New Item
 async function submitNewItem() {
+  const saveBtn = document.querySelector('#new-item-modal .modal-footer .btn-primary');
+  const originalText = saveBtn ? saveBtn.innerHTML : '';
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `<span>⏳ ${isAr ? 'جاري الحفظ والمزامنة...' : 'Saving & Syncing...'}</span>`;
+  }
+
   const folderId = document.getElementById('new-item-folder') ? document.getElementById('new-item-folder').value : null;
   const isFavorite = document.getElementById('new-item-favorite') ? document.getElementById('new-item-favorite').checked : false;
 
@@ -274,43 +283,43 @@ async function submitNewItem() {
       const title = document.getElementById('new-text-title').value;
       const content = document.getElementById('new-text-content').value;
       if (!title.trim() && !content.trim()) {
-        if (window.utils) window.utils.showToast('Please enter text content or title', 'warning');
+        if (window.utils) window.utils.showToast(isAr ? 'يرجى كتابة نص أو عنوان' : 'Please enter text content or title', 'warning');
         return;
       }
 
       await window.api.createTextItem({ title, content, folder_id: folderId, is_favorite: isFavorite, type: 'text' });
-      if (window.utils) window.utils.showToast('Text note saved & synced across devices!');
       closeNewModal();
-      window.refreshItems();
+      if (window.utils) window.utils.showToast(isAr ? 'تم حفظ ومزامنة الملاحظة بنجاح ☁️' : 'Text note saved & synced across devices!');
+      if (typeof window.refreshItems === 'function') await window.refreshItems();
     } else if (currentNewTab === 'clipboard') {
       const preview = document.getElementById('clipboard-preview-content');
       const content = preview ? (preview.dataset.content || preview.textContent) : '';
       if (!content || content.includes('Click "Read Clipboard"')) {
-        if (window.utils) window.utils.showToast('Please read or paste clipboard content first', 'warning');
+        if (window.utils) window.utils.showToast(isAr ? 'يرجى قراءة أو لصق محتوى الحافظة أولاً' : 'Please read or paste clipboard content first', 'warning');
         return;
       }
 
       await window.api.createTextItem({ content, folder_id: folderId, is_favorite: isFavorite, type: 'clipboard' });
-      if (window.utils) window.utils.showToast('Clipboard item saved & synced!');
       closeNewModal();
-      window.refreshItems();
+      if (window.utils) window.utils.showToast(isAr ? 'تم حفظ الحافظة ومزامنتها بنجاح ☁️' : 'Clipboard item saved & synced!');
+      if (typeof window.refreshItems === 'function') await window.refreshItems();
     } else if (currentNewTab === 'link') {
       const url = document.getElementById('new-link-url').value;
       const title = document.getElementById('new-link-title').value;
       if (!url.trim()) {
-        if (window.utils) window.utils.showToast('Please enter a URL', 'warning');
+        if (window.utils) window.utils.showToast(isAr ? 'يرجى إدخال الرابط' : 'Please enter a URL', 'warning');
         return;
       }
 
       await window.api.saveLink({ url, title, folder_id: folderId, is_favorite: isFavorite });
-      if (window.utils) window.utils.showToast('Link saved & synced!');
       closeNewModal();
-      window.refreshItems();
+      if (window.utils) window.utils.showToast(isAr ? 'تم حفظ الرابط ومزامنته بنجاح ☁️' : 'Link saved & synced!');
+      if (typeof window.refreshItems === 'function') await window.refreshItems();
     } else if (currentNewTab === 'file') {
       const fileInput = document.getElementById('new-file-input');
       const file = currentModalFile || (fileInput && fileInput.files ? fileInput.files[0] : null);
       if (!file) {
-        if (window.utils) window.utils.showToast('Please select or paste a file to upload', 'warning');
+        if (window.utils) window.utils.showToast(isAr ? 'يرجى اختيار أو لصق ملف للرفع' : 'Please select or paste a file to upload', 'warning');
         return;
       }
 
@@ -319,16 +328,16 @@ async function submitNewItem() {
       const title = (fileTitleInput && fileTitleInput.value.trim()) ? fileTitleInput.value.trim() : file.name;
       const content = (fileNotesInput && fileNotesInput.value.trim()) ? fileNotesInput.value.trim() : '';
 
-      if (window.utils) window.utils.showToast(`Uploading ${file.name}...`, 'info');
+      if (window.utils) window.utils.showToast(isAr ? `جاري حفظ ورفع ${file.name} ☁️...` : `Uploading ${file.name}...`, 'info');
       await window.api.uploadFile(file, folderId, false, { title, content, is_favorite: isFavorite });
-      if (window.utils) window.utils.showToast('File uploaded & synced!');
       closeNewModal();
-      window.refreshItems();
+      if (window.utils) window.utils.showToast(isAr ? 'تم رفع الملف والمزامنة بنجاح ☁️' : 'File uploaded & synced!');
+      if (typeof window.refreshItems === 'function') await window.refreshItems();
     } else if (currentNewTab === 'image') {
       const imageInput = document.getElementById('new-image-input');
       const file = currentModalFile || (imageInput && imageInput.files ? imageInput.files[0] : null);
       if (!file) {
-        if (window.utils) window.utils.showToast('Please select or paste an image to upload', 'warning');
+        if (window.utils) window.utils.showToast(isAr ? 'يرجى اختيار أو لصق صورة' : 'Please select or paste an image to upload', 'warning');
         return;
       }
 
@@ -337,17 +346,22 @@ async function submitNewItem() {
       const title = (imageTitleInput && imageTitleInput.value.trim()) ? imageTitleInput.value.trim() : file.name;
       const content = (imageNotesInput && imageNotesInput.value.trim()) ? imageNotesInput.value.trim() : '';
 
-      if (window.utils) window.utils.showToast(`Uploading ${file.name}...`, 'info');
+      if (window.utils) window.utils.showToast(isAr ? `جاري ضغط ورفع الصورة ${file.name} ☁️...` : `Uploading ${file.name}...`, 'info');
       await window.api.uploadFile(file, folderId, false, { title, content, is_favorite: isFavorite });
-      if (window.utils) window.utils.showToast('Image uploaded & synced!');
       closeNewModal();
-      window.refreshItems();
+      if (window.utils) window.utils.showToast(isAr ? 'تم رفع الصورة والمزامنة السحابية بنجاح ☁️' : 'Image uploaded & synced!');
+      if (typeof window.refreshItems === 'function') await window.refreshItems();
     }
   } catch (err) {
     if (err.data && err.data.duplicate) {
       handleDuplicateModal(err.data.existingItem, currentNewTab);
     } else {
       if (window.utils) window.utils.showToast(err.message || 'Action failed', 'warning');
+    }
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalText;
     }
   }
 }

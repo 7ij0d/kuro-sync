@@ -327,13 +327,25 @@ async function copyCardText(itemId, btn) {
 }
 
 async function copyCardImage(itemId, btn) {
-  const item = (window.currentItems || []).find(i => i.id === itemId);
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
-  const imgUrl = `/api/items/${item.id}/file`;
+  const imgUrl = (item.file_path && (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')))
+    ? item.file_path
+    : `/api/items/${item.id}/file`;
   await window.clipboardEngine.copyImage(imgUrl);
 }
 
 function downloadItemFile(itemId) {
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
+  if (item && item.file_path) {
+    const a = document.createElement('a');
+    a.href = item.file_path;
+    a.download = item.file_name || item.title || 'file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
   window.location.href = `/api/items/${itemId}/file?download=1`;
 }
 
