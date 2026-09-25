@@ -18,7 +18,70 @@ const LocalKuroStore = {
     } catch (e) {}
   },
   getItems() {
-    return this.get('items', []);
+    const raw = localStorage.getItem('kuro_local_items');
+    if (raw === null) {
+      const defaultItems = [
+        {
+          id: 'sp-1',
+          type: 'image',
+          title: 'Tooth development - Bell stage',
+          content: 'Key points:\n- Enamel organ\n- Dental papilla\n- Dental follicle\n- Stellate reticulum',
+          file_name: 'tooth_bell_stage.svg',
+          file_path: './assets/samples/histology_bell_stage.svg',
+          file_size: 1024 * 780,
+          device_name: 'iPad Pro',
+          device_type: 'ipad',
+          created_at: new Date().toISOString(),
+          deleted_at: null,
+          is_favorite: 1
+        },
+        {
+          id: 'sp-2',
+          type: 'file',
+          title: 'Pathology.pdf',
+          file_name: 'Pathology.pdf',
+          file_path: './assets/samples/Pathology.pdf',
+          file_size: 2.4 * 1024 * 1024,
+          device_name: 'iPad Pro',
+          device_type: 'ipad',
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+          deleted_at: null,
+          is_favorite: 0
+        },
+        {
+          id: 'sp-3',
+          type: 'text',
+          title: 'Operative Dentistry Notes',
+          content: 'Cavity preparation principles:\n1. Retention form\n2. Resistance form\n3. Convenience form\n4. Removal of remaining carious dentin\n5. Finishing enamel walls\n6. Cleaning the cavity',
+          file_size: 180,
+          device_name: 'iPad Pro',
+          device_type: 'ipad',
+          created_at: new Date(Date.now() - 7200000).toISOString(),
+          deleted_at: null,
+          is_favorite: 1
+        },
+        {
+          id: 'sp-4',
+          type: 'image',
+          title: 'IMG_3287.jpg',
+          file_name: 'IMG_3287.jpg',
+          file_path: './assets/samples/notebook_notes.svg',
+          file_size: 1.8 * 1024 * 1024,
+          device_name: 'iPad Pro',
+          device_type: 'ipad',
+          created_at: new Date(Date.now() - 10800000).toISOString(),
+          deleted_at: null,
+          is_favorite: 0
+        }
+      ];
+      this.saveItems(defaultItems);
+      return defaultItems;
+    }
+    try {
+      return JSON.parse(raw) || [];
+    } catch (e) {
+      return [];
+    }
   },
   saveItems(items) {
     this.set('items', items);
@@ -59,6 +122,10 @@ const api = {
   },
 
   async request(url, options = {}) {
+    if (this.isStaticHost) {
+      return this.handleStaticFallback(url, options);
+    }
+
     const token = this.getToken();
     const headers = { ...options.headers };
 
@@ -79,10 +146,6 @@ const api = {
         throw new Error('Unauthorized');
       }
 
-      if (response.status === 404 && this.isStaticHost) {
-        throw new Error('StaticHostFallback');
-      }
-
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const err = new Error(data.error || 'Request failed');
@@ -93,15 +156,15 @@ const api = {
 
       return data;
     } catch (err) {
-      if (this.isStaticHost || err.message === 'Failed to fetch' || err.message === 'StaticHostFallback') {
+      if (err.message === 'Failed to fetch') {
         return this.handleStaticFallback(url, options);
       }
       throw err;
     }
   },
 
-  // Fallback for GitHub Pages
-  async handleStaticFallback(url, options) {
+  // Fallback for GitHub Pages / Static Hosting
+  async handleStaticFallback(url, options = {}) {
     const method = (options.method || 'GET').toUpperCase();
     const u = new URL(url, window.location.origin);
     const pathname = u.pathname;
@@ -119,7 +182,7 @@ const api = {
       };
     }
 
-    // 2. Instant Demo / Login
+    // 2. Instant Demo / Login / Register
     if (pathname.includes('/auth/login') || pathname.includes('/auth/register') || pathname.includes('/auth/instant-demo')) {
       const token = 'ghp-mock-token-' + Date.now();
       this.setToken(token);
@@ -150,35 +213,111 @@ const api = {
       };
     }
 
-    // 5. Items List
-    if (pathname.endsWith('/items') && method === 'GET') {
+    // 5. Permanent Delete: DELETE .../items/:id/permanent
+    if (pathname.includes('/permanent') && method === 'DELETE') {
+      const match = pathname.match(/\/items\/([^/]+)\/permanent/);
+      const id = match ? match[1] : pathname.split('/').filter(Boolean).slice(-2)[0];
+      let items = LocalKuroStore.getItems();
+      items = items.filter(i => String(i.id) !== String(id));
+      LocalKuroStore.saveItems(items);
+      return { success: true };
+    }
+
+    // 6. Empty Trash: POST .../trash/empty
+    if (pathname.includes('/trash/empty') && method === 'POST') {
+      let items = LocalKuroStore.getItems();
+      items = items.filter(i => !i.deleted_at);
+      LocalKuroStore.saveItems(items);
+      return { success: true };
+    }
+
+    // 7. Restore: POST .../items/:id/restore
+    if (pathname.includes('/restore') && method === 'POST') {
+      const match = pathname.match(/\/items\/([^/]+)\/restore/);
+      const id = match ? match[1] : null;
+      if (id) {
+        const items = LocalKuroStore.getItems();
+        const item = items.find(i => String(i.id) === String(id));
+        if (item) item.deleted_at = null;
+        LocalKuroStore.saveItems(items);
+      }
+      return { success: true };
+    }
+
+    // 8. Soft Delete: DELETE .../items/:id
+    if (method === 'DELETE' && pathname.includes('/items/')) {
+      const match = pathname.match(/\/items\/([^/]+)$/);
+      const id = match ? match[1] : pathname.split('/').filter(Boolean).pop();
+      const items = LocalKuroStore.getItems();
+      const item = items.find(i => String(i.id) === String(id));
+      if (item) {
+        item.deleted_at = new Date().toISOString();
+        LocalKuroStore.saveItems(items);
+      } else {
+        const updated = items.filter(i => String(i.id) !== String(id));
+        LocalKuroStore.saveItems(updated);
+      }
+      return { success: true };
+    }
+
+    // 9. Update Item: PATCH .../items/:id
+    if (method === 'PATCH' && pathname.includes('/items/')) {
+      const match = pathname.match(/\/items\/([^/]+)$/);
+      const id = match ? match[1] : pathname.split('/').filter(Boolean).pop();
+      const body = JSON.parse(options.body || '{}');
+      const items = LocalKuroStore.getItems();
+      const item = items.find(i => String(i.id) === String(id));
+      if (item) {
+        Object.assign(item, body);
+        item.updated_at = new Date().toISOString();
+        LocalKuroStore.saveItems(items);
+        return { success: true, item };
+      }
+      return { success: true };
+    }
+
+    // 10. Items List: GET .../items
+    if (pathname.includes('/items') && method === 'GET') {
       const items = LocalKuroStore.getItems();
       const trash = u.searchParams.get('trash') === '1';
       const type = u.searchParams.get('type');
+      const isFav = u.searchParams.get('is_favorite') === '1';
+      const search = (u.searchParams.get('search') || '').toLowerCase().trim();
+
       const filtered = items.filter(i => {
-        if (trash) return i.deleted_at !== null;
-        if (i.deleted_at !== null) return false;
+        if (trash) {
+          if (!i.deleted_at) return false;
+        } else {
+          if (i.deleted_at) return false;
+        }
+        if (isFav && !i.is_favorite) return false;
         if (type && type !== 'all' && i.type !== type) return false;
+        if (search) {
+          const matchTitle = (i.title || '').toLowerCase().includes(search);
+          const matchContent = (i.content || '').toLowerCase().includes(search);
+          const matchFile = (i.file_name || '').toLowerCase().includes(search);
+          if (!matchTitle && !matchContent && !matchFile) return false;
+        }
         return true;
       });
 
       return {
         items: filtered,
         counts: {
-          all: items.filter(i => i.deleted_at === null).length,
-          text: items.filter(i => i.type === 'text' && i.deleted_at === null).length,
-          images: items.filter(i => i.type === 'image' && i.deleted_at === null).length,
-          files: items.filter(i => i.type === 'file' && i.deleted_at === null).length,
-          links: items.filter(i => i.type === 'link' && i.deleted_at === null).length,
-          clipboard: items.filter(i => i.type === 'clipboard' && i.deleted_at === null).length,
-          favorites: items.filter(i => i.is_favorite && i.deleted_at === null).length,
-          trash: items.filter(i => i.deleted_at !== null).length
+          all: items.filter(i => !i.deleted_at).length,
+          text: items.filter(i => i.type === 'text' && !i.deleted_at).length,
+          images: items.filter(i => i.type === 'image' && !i.deleted_at).length,
+          files: items.filter(i => i.type === 'file' && !i.deleted_at).length,
+          links: items.filter(i => i.type === 'link' && !i.deleted_at).length,
+          clipboard: items.filter(i => i.type === 'clipboard' && !i.deleted_at).length,
+          favorites: items.filter(i => i.is_favorite && !i.deleted_at).length,
+          trash: items.filter(i => !!i.deleted_at).length
         },
         storage: { used: 4200000, quota: 21474836480 }
       };
     }
 
-    // 6. Text / Note Create
+    // 11. Text / Note Create: POST .../items/text
     if (pathname.includes('/items/text') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       const newItem = {
@@ -198,7 +337,7 @@ const api = {
       return { success: true, item: newItem };
     }
 
-    // 7. Save Link
+    // 12. Save Link: POST .../items/link
     if (pathname.includes('/items/link') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       const newItem = {
@@ -206,6 +345,7 @@ const api = {
         type: 'link',
         title: body.title || body.url,
         content: body.url,
+        is_favorite: body.is_favorite ? 1 : 0,
         device_name: 'iPad Pro',
         device_type: 'ipad',
         created_at: new Date().toISOString(),
@@ -217,31 +357,12 @@ const api = {
       return { success: true, item: newItem };
     }
 
-    // 8. Delete / Restore
-    if (pathname.includes('/items/') && method === 'DELETE') {
-      const id = pathname.split('/').pop();
-      const items = LocalKuroStore.getItems();
-      const item = items.find(i => i.id === id);
-      if (item) item.deleted_at = new Date().toISOString();
-      LocalKuroStore.saveItems(items);
-      return { success: true };
-    }
-
-    if (pathname.includes('/restore') && method === 'POST') {
-      const id = pathname.split('/')[2];
-      const items = LocalKuroStore.getItems();
-      const item = items.find(i => i.id === id);
-      if (item) item.deleted_at = null;
-      LocalKuroStore.saveItems(items);
-      return { success: true };
-    }
-
-    // 9. Folders
+    // 13. Folders
     if (pathname.includes('/folders')) {
       return LocalKuroStore.getFolders();
     }
 
-    // 10. Sample Pack
+    // 14. Sample Pack
     if (pathname.includes('/demo/sample-pack')) {
       const samples = [
         {
@@ -255,7 +376,8 @@ const api = {
           device_name: 'iPad Pro',
           device_type: 'ipad',
           created_at: new Date().toISOString(),
-          deleted_at: null
+          deleted_at: null,
+          is_favorite: 1
         },
         {
           id: 'sp-2',
@@ -267,7 +389,8 @@ const api = {
           device_name: 'iPad Pro',
           device_type: 'ipad',
           created_at: new Date(Date.now() - 3600000).toISOString(),
-          deleted_at: null
+          deleted_at: null,
+          is_favorite: 0
         },
         {
           id: 'sp-3',
@@ -278,7 +401,8 @@ const api = {
           device_name: 'iPad Pro',
           device_type: 'ipad',
           created_at: new Date(Date.now() - 7200000).toISOString(),
-          deleted_at: null
+          deleted_at: null,
+          is_favorite: 1
         },
         {
           id: 'sp-4',
@@ -290,7 +414,8 @@ const api = {
           device_name: 'iPad Pro',
           device_type: 'ipad',
           created_at: new Date(Date.now() - 10800000).toISOString(),
-          deleted_at: null
+          deleted_at: null,
+          is_favorite: 0
         }
       ];
       LocalKuroStore.saveItems(samples);

@@ -157,10 +157,26 @@ async function toggleViewerFavorite() {
 
 async function deleteViewerItem() {
   if (!activeViewerItem) return;
-  await window.api.deleteItem(activeViewerItem.id);
-  if (window.utils) window.utils.showToast('Item moved to trash');
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const confirmMsg = isAr 
+    ? 'هل أنت متأكد من حذف هذا العنصر ونقله إلى سلة المحذوفات؟' 
+    : 'Move this item to trash?';
+  if (!confirm(confirmMsg)) return;
+
+  const id = activeViewerItem.id;
   closeItemViewer();
-  window.refreshItems();
+
+  // Optimistic UI update
+  window.currentItems = (window.currentItems || []).filter(i => String(i.id) !== String(id));
+  if (window.renderItemsFeed) window.renderItemsFeed(window.currentItems);
+
+  try {
+    await window.api.deleteItem(id);
+    if (window.utils) window.utils.showToast(isAr ? 'تم نقل العنصر إلى سلة المحذوفات' : 'Item moved to trash');
+    window.refreshItems();
+  } catch (err) {
+    if (window.utils) window.utils.showToast(err.message, 'warning');
+  }
 }
 
 function openViewerShare() {

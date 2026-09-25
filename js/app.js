@@ -338,46 +338,120 @@ function downloadItemFile(itemId) {
 }
 
 async function deleteItem(itemId) {
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const confirmMsg = isAr 
+    ? 'هل أنت متأكد من حذف هذا العنصر ونقله إلى سلة المحذوفات؟' 
+    : 'Are you sure you want to move this item to the trash?';
+
+  if (!confirm(confirmMsg)) return;
+
+  // Optimistic UI update: instantly remove from screen
+  const prevItems = [...(window.currentItems || [])];
+  window.currentItems = window.currentItems.filter(i => String(i.id) !== String(itemId));
+  renderItemsFeed(window.currentItems);
+
   try {
     await window.api.deleteItem(itemId);
-    if (window.utils) window.utils.showToast('Moved to trash');
+    if (window.utils) {
+      window.utils.showToast(isAr ? 'تم نقل العنصر إلى سلة المحذوفات' : 'Moved to trash');
+    }
     refreshItems();
   } catch (err) {
+    window.currentItems = prevItems;
+    renderItemsFeed(window.currentItems);
     if (window.utils) window.utils.showToast(err.message, 'warning');
   }
 }
 
 async function restoreItem(itemId) {
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  // Optimistic UI update: remove from trash view
+  const prevItems = [...(window.currentItems || [])];
+  window.currentItems = window.currentItems.filter(i => String(i.id) !== String(itemId));
+  renderItemsFeed(window.currentItems);
+
   try {
     await window.api.restoreItem(itemId);
-    if (window.utils) window.utils.showToast('Item restored');
+    if (window.utils) {
+      window.utils.showToast(isAr ? 'تم استرجاع العنصر إلى مساحتك بنجاح' : 'Item restored');
+    }
+    refreshItems();
+  } catch (err) {
+    window.currentItems = prevItems;
+    renderItemsFeed(window.currentItems);
+    if (window.utils) window.utils.showToast(err.message, 'warning');
+  }
+}
+
+async function permanentDeleteItem(itemId) {
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const confirmMsg = isAr 
+    ? 'هل أنت متأكد من حذف هذا العنصر نهائياً؟ لن يمكنك التراجع عن هذا الإجراء.' 
+    : 'Permanently delete this item? This action cannot be undone.';
+
+  if (!confirm(confirmMsg)) return;
+
+  // Optimistic UI update
+  const prevItems = [...(window.currentItems || [])];
+  window.currentItems = window.currentItems.filter(i => String(i.id) !== String(itemId));
+  renderItemsFeed(window.currentItems);
+
+  try {
+    await window.api.permanentDeleteItem(itemId);
+    if (window.utils) {
+      window.utils.showToast(isAr ? 'تم حذف العنصر نهائياً' : 'Item permanently deleted');
+    }
+    refreshItems();
+  } catch (err) {
+    window.currentItems = prevItems;
+    renderItemsFeed(window.currentItems);
+    if (window.utils) window.utils.showToast(err.message, 'warning');
+  }
+}
+
+async function emptyTrash() {
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const confirmMsg = isAr 
+    ? 'هل أنت متأكد من تفريغ سلة المحذوفات بالكامل وحذف جميع عناصرها نهائياً؟' 
+    : 'Are you sure you want to empty the trash permanently?';
+
+  if (!confirm(confirmMsg)) return;
+
+  window.currentItems = [];
+  renderItemsFeed([]);
+
+  try {
+    await window.api.emptyTrash();
+    if (window.utils) {
+      window.utils.showToast(isAr ? 'تم تفريغ سلة المحذوفات بنجاح' : 'Trash emptied');
+    }
     refreshItems();
   } catch (err) {
     if (window.utils) window.utils.showToast(err.message, 'warning');
   }
 }
 
-async function permanentDeleteItem(itemId) {
-  if (confirm('Permanently delete this item? This action cannot be undone.')) {
-    try {
-      await window.api.permanentDeleteItem(itemId);
-      if (window.utils) window.utils.showToast('Item permanently deleted');
-      refreshItems();
-    } catch (err) {
-      if (window.utils) window.utils.showToast(err.message, 'warning');
-    }
-  }
-}
+// Toggle Favorite Star Directly
+async function toggleItemFavorite(itemId, event) {
+  if (event) event.stopPropagation();
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
+  if (!item) return;
 
-async function emptyTrash() {
-  if (confirm('Are you sure you want to empty the trash permanently?')) {
-    try {
-      await window.api.emptyTrash();
-      if (window.utils) window.utils.showToast('Trash emptied');
-      refreshItems();
-    } catch (err) {
-      if (window.utils) window.utils.showToast(err.message, 'warning');
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const newFav = item.is_favorite ? 0 : 1;
+  item.is_favorite = newFav;
+  renderItemsFeed(window.currentItems);
+
+  try {
+    await window.api.updateItem(itemId, { is_favorite: newFav });
+    if (window.utils) {
+      window.utils.showToast(newFav ? (isAr ? 'تمت الإضافة للمفضلة ★' : 'Added to favorites') : (isAr ? 'تمت الإزالة من المفضلة' : 'Removed from favorites'));
     }
+    refreshItems();
+  } catch (err) {
+    item.is_favorite = newFav ? 0 : 1;
+    renderItemsFeed(window.currentItems);
+    if (window.utils) window.utils.showToast(err.message, 'warning');
   }
 }
 
@@ -434,19 +508,8 @@ function setupDragAndDrop() {
 
 // Three-dot options menu
 function openItemOptionsMenu(itemId, event) {
-  const item = (window.currentItems || []).find(i => i.id === itemId);
-  if (!item) return;
-
-  const isFav = item.is_favorite;
-  const action = confirm(
-    `Item: "${item.title}"\n\n- Click OK to ${isFav ? 'Remove from Favorites' : 'Add to Favorites'}\n- Click Cancel to Delete / Move to Trash`
-  );
-
-  if (action) {
-    window.api.updateItem(itemId, { is_favorite: !isFav }).then(() => refreshItems());
-  } else {
-    deleteItem(itemId);
-  }
+  if (event) event.stopPropagation();
+  toggleItemFavorite(itemId, event);
 }
 
 // Theme Switcher (Light / Dark)
