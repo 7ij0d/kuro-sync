@@ -103,7 +103,17 @@ function renderItemCard(item, currentView = 'all') {
         </button>
       `;
     } else if (item.type === 'file') {
+      const hasNotes = item.content && item.content.trim().length > 0;
       actionButtonsHtml = `
+        ${hasNotes ? `
+        <button class="btn-card-action" title="${t('copyText') || 'نسخ النص'}" onclick="event.stopPropagation(); copyCardText('${item.id}', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          <span class="btn-label">${t('copyText') || 'نسخ النص'}</span>
+        </button>
+        ` : ''}
         <button class="btn-card-action" onclick="event.stopPropagation(); downloadItemFile('${item.id}')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -114,15 +124,45 @@ function renderItemCard(item, currentView = 'all') {
         </button>
       `;
     } else if (item.type === 'image') {
-      actionButtonsHtml = `
-        <button class="btn-card-action" onclick="event.stopPropagation(); copyCardImage('${item.id}', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-          <span>${t('copyImage')}</span>
-        </button>
-      `;
+      const hasNotes = item.content && item.content.trim().length > 0;
+      if (hasNotes) {
+        actionButtonsHtml = `
+          <button class="btn-card-action" title="${t('copyText') || 'نسخ النص'}" onclick="event.stopPropagation(); copyCardText('${item.id}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <span class="btn-label">${t('copyText') || 'نسخ النص'}</span>
+          </button>
+          <button class="btn-card-action" title="${t('copyImage') || 'نسخ الصورة'}" onclick="event.stopPropagation(); copyCardImage('${item.id}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span class="btn-label">${t('copyImage') || 'نسخ الصورة'}</span>
+          </button>
+          <button class="btn-card-action btn-card-both" title="${t('copyBoth') || 'نسخ الاثنين معاً'}" onclick="event.stopPropagation(); copyCardCombined('${item.id}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
+            <span class="btn-label">${t('copyBoth') || 'نسخ الاثنين'}</span>
+          </button>
+        `;
+      } else {
+        actionButtonsHtml = `
+          <button class="btn-card-action" onclick="event.stopPropagation(); copyCardImage('${item.id}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="btn-label">${t('copyImage')}</span>
+          </button>
+        `;
+      }
     } else if (item.type === 'link') {
       actionButtonsHtml = `
         <button class="btn-card-action" onclick="event.stopPropagation(); window.open('${escapeHtml(item.content)}', '_blank')">

@@ -18,70 +18,25 @@ const LocalKuroStore = {
     } catch (e) {}
   },
   getItems() {
-    const raw = localStorage.getItem('kuro_local_items');
-    if (raw === null) {
-      const defaultItems = [
-        {
-          id: 'sp-1',
-          type: 'image',
-          title: 'Tooth development - Bell stage',
-          content: 'Key points:\n- Enamel organ\n- Dental papilla\n- Dental follicle\n- Stellate reticulum',
-          file_name: 'tooth_bell_stage.svg',
-          file_path: './assets/samples/histology_bell_stage.svg',
-          file_size: 1024 * 780,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date().toISOString(),
-          deleted_at: null,
-          is_favorite: 1
-        },
-        {
-          id: 'sp-2',
-          type: 'file',
-          title: 'Pathology.pdf',
-          file_name: 'Pathology.pdf',
-          file_path: './assets/samples/Pathology.pdf',
-          file_size: 2.4 * 1024 * 1024,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          deleted_at: null,
-          is_favorite: 0
-        },
-        {
-          id: 'sp-3',
-          type: 'text',
-          title: 'Operative Dentistry Notes',
-          content: 'Cavity preparation principles:\n1. Retention form\n2. Resistance form\n3. Convenience form\n4. Removal of remaining carious dentin\n5. Finishing enamel walls\n6. Cleaning the cavity',
-          file_size: 180,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date(Date.now() - 7200000).toISOString(),
-          deleted_at: null,
-          is_favorite: 1
-        },
-        {
-          id: 'sp-4',
-          type: 'image',
-          title: 'IMG_3287.jpg',
-          file_name: 'IMG_3287.jpg',
-          file_path: './assets/samples/notebook_notes.svg',
-          file_size: 1.8 * 1024 * 1024,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date(Date.now() - 10800000).toISOString(),
-          deleted_at: null,
-          is_favorite: 0
-        }
-      ];
-      this.saveItems(defaultItems);
-      return defaultItems;
-    }
+    // 1. Check cached Supabase items
     try {
-      return JSON.parse(raw) || [];
-    } catch (e) {
-      return [];
+      const sbCached = localStorage.getItem('kuro_cached_supabase_items');
+      if (sbCached) {
+        const parsed = JSON.parse(sbCached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+
+    // 2. Check local store items
+    const raw = localStorage.getItem('kuro_local_items');
+    if (raw !== null) {
+      try {
+        return JSON.parse(raw) || [];
+      } catch (e) {
+        return [];
+      }
     }
+    return [];
   },
   saveItems(items) {
     this.set('items', items);
@@ -407,64 +362,9 @@ const api = {
       return LocalKuroStore.getFolders();
     }
 
-    // 14. Sample Pack
+    // 14. Sample Pack (Disabled to protect user items)
     if (pathname.includes('/demo/sample-pack')) {
-      const samples = [
-        {
-          id: 'sp-1',
-          type: 'image',
-          title: 'Tooth development - Bell stage',
-          content: 'Key points:\n- Enamel organ\n- Dental papilla\n- Dental follicle\n- Stellate reticulum',
-          file_name: 'tooth_bell_stage.svg',
-          file_path: './assets/samples/histology_bell_stage.svg',
-          file_size: 1024 * 780,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date().toISOString(),
-          deleted_at: null,
-          is_favorite: 1
-        },
-        {
-          id: 'sp-2',
-          type: 'file',
-          title: 'Pathology.pdf',
-          file_name: 'Pathology.pdf',
-          file_path: './assets/samples/Pathology.pdf',
-          file_size: 2.4 * 1024 * 1024,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          deleted_at: null,
-          is_favorite: 0
-        },
-        {
-          id: 'sp-3',
-          type: 'text',
-          title: 'Operative Dentistry Notes',
-          content: 'Cavity preparation principles:\n1. Retention form\n2. Resistance form\n3. Convenience form\n4. Removal of remaining carious dentin\n5. Finishing enamel walls\n6. Cleaning the cavity',
-          file_size: 180,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date(Date.now() - 7200000).toISOString(),
-          deleted_at: null,
-          is_favorite: 1
-        },
-        {
-          id: 'sp-4',
-          type: 'image',
-          title: 'IMG_3287.jpg',
-          file_name: 'IMG_3287.jpg',
-          file_path: './assets/samples/notebook_notes.svg',
-          file_size: 1.8 * 1024 * 1024,
-          device_name: 'iPad Pro',
-          device_type: 'ipad',
-          created_at: new Date(Date.now() - 10800000).toISOString(),
-          deleted_at: null,
-          is_favorite: 0
-        }
-      ];
-      LocalKuroStore.saveItems(samples);
-      return { success: true, count: 4 };
+      return { success: true, count: 0 };
     }
 
     return { success: true };

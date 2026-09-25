@@ -30,6 +30,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.setupHeaderControls) window.setupHeaderControls();
   setupDragAndDrop();
 
+  // Instant SWR First Paint from local cache (0ms delay)
+  try {
+    const cachedItems = (window.KuroSupabase && window.KuroSupabase.getCachedItems) ? window.KuroSupabase.getCachedItems() : null;
+    if (cachedItems && Array.isArray(cachedItems) && cachedItems.length > 0) {
+      window.currentItems = cachedItems;
+      renderItemsFeed(cachedItems);
+    }
+  } catch (e) {}
+
   // 5. Check URL parameters (e.g. ?pair=KXXXXX)
   const urlParams = new URLSearchParams(window.location.search);
   const pairCode = urlParams.get('pair');
@@ -131,13 +140,24 @@ async function refreshItems() {
     window.currentItems = data.items;
     window.currentStorage = data.storage;
 
+    // Cache to local storage for instant zero-delay loading on startup
+    if (!isTrashView && !isFavoritesView && (!params.type || params.type === 'all') && !params.search) {
+      if (window.KuroSupabase && window.KuroSupabase.setCachedItems) {
+        window.KuroSupabase.setCachedItems(data.items);
+      }
+    }
+
     // Update badges & storage meter
     if (window.updateSidebarBadges) window.updateSidebarBadges(data.counts);
     if (window.updateStorageMeter) window.updateStorageMeter(data.storage);
 
     renderItemsFeed(data.items);
   } catch (err) {
-    itemsContainer.innerHTML = `<div style="padding:24px; text-align:center; color:var(--danger);">Failed to load items</div>`;
+    console.warn('refreshItems error:', err);
+    if (!window.currentItems || window.currentItems.length === 0) {
+      const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+      itemsContainer.innerHTML = `<div style="padding:24px; text-align:center; color:var(--text-muted);">${isAr ? 'تعذر جلب العناصر من السحابة. يرجى التحقق من الاتصال.' : 'Failed to sync with cloud.'}</div>`;
+    }
   }
 }
 
@@ -174,9 +194,6 @@ function renderItemsFeed(items = []) {
           </button>
           <button class="btn-secondary" onclick="openDeviceModal()">
             ${t('connectDevice')}
-          </button>
-          <button class="btn-secondary" style="font-size:0.8125rem; border-style:dashed;" onclick="loadSamplePack()">
-            ${t('loadSamplePack')}
           </button>
         </div>
       </div>
@@ -310,18 +327,20 @@ function selectFolder(folderId) {
 
 // Quick Card Actions
 async function copyCardText(itemId, btn) {
-  const item = (window.currentItems || []).find(i => i.id === itemId);
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item || !item.content) return;
 
-  const success = await window.clipboardEngine.copyText(item.content);
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const success = await window.clipboardEngine.copyText(item.content, isAr ? 'تم نسخ النص بنجاح! 📝' : 'Text copied to clipboard!');
   if (success && btn) {
-    const originalLabel = btn.querySelector('.btn-label') ? btn.querySelector('.btn-label').textContent : 'Copy';
+    const labelSpan = btn.querySelector('.btn-label') || btn;
+    const originalLabel = labelSpan.textContent;
     btn.classList.add('btn-copied');
-    if (btn.querySelector('.btn-label')) btn.querySelector('.btn-label').textContent = '✓ Copied';
+    labelSpan.textContent = isAr ? '✓ تم النسخ' : '✓ Copied';
 
     setTimeout(() => {
       btn.classList.remove('btn-copied');
-      if (btn.querySelector('.btn-label')) btn.querySelector('.btn-label').textContent = originalLabel;
+      labelSpan.textContent = originalLabel;
     }, 2000);
   }
 }
@@ -332,7 +351,42 @@ async function copyCardImage(itemId, btn) {
   const imgUrl = (item.file_path && (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')))
     ? item.file_path
     : `/api/items/${item.id}/file`;
-  await window.clipboardEngine.copyImage(imgUrl);
+
+  const success = await window.clipboardEngine.copyImage(imgUrl);
+  if (success && btn) {
+    const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+    const labelSpan = btn.querySelector('.btn-label') || btn;
+    const originalLabel = labelSpan.textContent;
+    btn.classList.add('btn-copied');
+    labelSpan.textContent = isAr ? '✓ تم نسخ الصورة' : '✓ Copied';
+
+    setTimeout(() => {
+      btn.classList.remove('btn-copied');
+      labelSpan.textContent = originalLabel;
+    }, 2000);
+  }
+}
+
+async function copyCardCombined(itemId, btn) {
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
+  if (!item) return;
+  const imgUrl = (item.file_path && (item.file_path.startsWith('data:') || item.file_path.startsWith('http') || item.file_path.startsWith('./') || item.file_path.startsWith('blob:')))
+    ? item.file_path
+    : `/api/items/${item.id}/file`;
+
+  const success = await window.clipboardEngine.copyCombined(item.content || '', imgUrl, item.title || '');
+  if (success && btn) {
+    const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+    const labelSpan = btn.querySelector('.btn-label') || btn;
+    const originalLabel = labelSpan.textContent;
+    btn.classList.add('btn-copied');
+    labelSpan.textContent = isAr ? '✓ تم نسخ الاثنين' : '✓ Copied';
+
+    setTimeout(() => {
+      btn.classList.remove('btn-copied');
+      labelSpan.textContent = originalLabel;
+    }, 2000);
+  }
 }
 
 function downloadItemFile(itemId) {
@@ -582,6 +636,7 @@ window.switchNavView = switchNavView;
 window.selectFolder = selectFolder;
 window.copyCardText = copyCardText;
 window.copyCardImage = copyCardImage;
+window.copyCardCombined = copyCardCombined;
 window.downloadItemFile = downloadItemFile;
 window.deleteItem = deleteItem;
 window.restoreItem = restoreItem;

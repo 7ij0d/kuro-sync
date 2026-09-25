@@ -74,12 +74,31 @@ function openItemViewer(itemId) {
         <div style="max-height:420px; width:100%; overflow:hidden; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center;">
           <img src="${fileUrl}" alt="${item.title}" style="max-width:100%; max-height:420px; object-fit:contain;" />
         </div>
-        <div style="display:flex; gap:12px;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%;">
           <button class="btn-card-action" onclick="copyCardImage('${item.id}', this)">
-            ${window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة'}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span class="btn-label">${window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة'}</span>
+          </button>
+          <button class="btn-card-action" onclick="copyViewerNotes('${item.id}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span class="btn-label">${window.i18n ? (window.i18n.t('copyText') || 'نسخ النص') : 'نسخ النص'}</span>
+          </button>
+          <button class="btn-card-action btn-card-both" onclick="copyViewerCombined('${item.id}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
+            <span class="btn-label">${window.i18n ? (window.i18n.t('copyBoth') || 'نسخ الاثنين معاً') : 'نسخ الاثنين معاً'}</span>
           </button>
           <button class="btn-primary" onclick="downloadItemFile('${item.id}')">
-            ${window.i18n ? window.i18n.t('download') : 'تحميل'}
+            ⬇️ ${window.i18n ? window.i18n.t('download') : 'تحميل'}
           </button>
         </div>
 
@@ -255,6 +274,49 @@ async function deleteViewerItem() {
   }
 }
 
+async function copyViewerNotes(itemId, btn) {
+  const editor = document.getElementById('viewer-img-notes') || document.getElementById('viewer-file-notes') || document.getElementById('viewer-text-editor');
+  const text = editor ? editor.value : (activeViewerItem ? activeViewerItem.content : '');
+  if (!text) {
+    if (window.utils) window.utils.showToast('لا يوجد نص لنسخه في هذا العنصر', 'warning');
+    return;
+  }
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const success = await window.clipboardEngine.copyText(text, isAr ? 'تم نسخ النص بنجاح! 📝' : 'Copied text!');
+  if (success && btn) {
+    const label = btn.querySelector('.btn-label') || btn;
+    const old = label.textContent;
+    btn.classList.add('btn-copied');
+    label.textContent = isAr ? '✓ تم النسخ' : '✓ Copied';
+    setTimeout(() => {
+      btn.classList.remove('btn-copied');
+      label.textContent = old;
+    }, 2000);
+  }
+}
+
+async function copyViewerCombined(itemId, btn) {
+  if (!activeViewerItem) return;
+  const editor = document.getElementById('viewer-img-notes');
+  const text = editor ? editor.value : (activeViewerItem.content || '');
+  const imgUrl = (activeViewerItem.file_path && (activeViewerItem.file_path.startsWith('data:') || activeViewerItem.file_path.startsWith('http') || activeViewerItem.file_path.startsWith('./') || activeViewerItem.file_path.startsWith('blob:')))
+    ? activeViewerItem.file_path
+    : `/api/items/${activeViewerItem.id}/file`;
+
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const success = await window.clipboardEngine.copyCombined(text, imgUrl, activeViewerItem.title || '');
+  if (success && btn) {
+    const label = btn.querySelector('.btn-label') || btn;
+    const old = label.textContent;
+    btn.classList.add('btn-copied');
+    label.textContent = isAr ? '✓ تم نسخ الاثنين' : '✓ Copied';
+    setTimeout(() => {
+      btn.classList.remove('btn-copied');
+      label.textContent = old;
+    }, 2000);
+  }
+}
+
 function openViewerShare() {
   if (!activeViewerItem) return;
   window.openShareModal(activeViewerItem.id);
@@ -263,6 +325,8 @@ function openViewerShare() {
 window.openItemViewer = openItemViewer;
 window.closeItemViewer = closeItemViewer;
 window.copyViewerText = copyViewerText;
+window.copyViewerNotes = copyViewerNotes;
+window.copyViewerCombined = copyViewerCombined;
 window.toggleViewerFavorite = toggleViewerFavorite;
 window.deleteViewerItem = deleteViewerItem;
 window.openViewerShare = openViewerShare;

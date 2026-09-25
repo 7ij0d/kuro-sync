@@ -240,9 +240,32 @@
 }
 
 .btn-card-action.btn-copied {
-  background: var(--success);
-  border-color: var(--success);
-  color: #FFFFFF;
+  background: var(--success) !important;
+  border-color: var(--success) !important;
+  color: #FFFFFF !important;
+}
+
+.btn-card-both {
+  background: var(--burgundy-50);
+  border-color: rgba(125, 29, 45, 0.25);
+  color: var(--burgundy-700);
+}
+
+.btn-card-both:hover {
+  background: var(--burgundy-700) !important;
+  border-color: var(--burgundy-700) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .btn-card-both {
+  background: rgba(125, 29, 45, 0.2);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #FCA5A5;
+}
+
+[data-theme="dark"] .btn-card-both:hover {
+  background: var(--burgundy-600) !important;
+  color: #FFFFFF !important;
 }
 
 .btn-card-delete {

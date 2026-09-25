@@ -43,26 +43,115 @@ const clipboardEngine = {
     }
   },
 
-  // Copy Image to system clipboard (where browser allows)
+  // Helper to convert any image (JPEG, WebP, SVG, DataURL) to a standard PNG Blob
+  async urlToPngBlob(imageUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 300;
+          canvas.height = img.naturalHeight || img.height || 300;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas toBlob failed'));
+          }, 'image/png');
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = () => reject(new Error('Image failed to load for conversion'));
+      img.src = imageUrl;
+    });
+  },
+
+  // Copy Image to system clipboard as universal PNG (Supported across Chrome, Safari, Edge)
   async copyImage(imageUrl) {
     try {
       if (!navigator.clipboard || !window.ClipboardItem) {
-        if (window.utils) window.utils.showToast('Browser does not support direct image copying. Please use download.', 'warning');
+        if (window.utils) window.utils.showToast(window.i18n ? window.i18n.t('offline') : 'المتصفح لا يدعم نسخ الصور، يرجى التنزيل.', 'warning');
         return false;
       }
 
-      const res = await fetch(imageUrl);
-      const blob = await res.blob();
-      const item = new ClipboardItem({ [blob.type]: blob });
+      // Convert to PNG blob for guaranteed clipboard write support
+      let pngBlob = null;
+      try {
+        pngBlob = await this.urlToPngBlob(imageUrl);
+      } catch (convErr) {
+        const res = await fetch(imageUrl);
+        pngBlob = await res.blob();
+      }
+
+      const item = new ClipboardItem({ 'image/png': pngBlob });
       await navigator.clipboard.write([item]);
 
-      if (window.utils) window.utils.showToast(window.i18n ? window.i18n.t('copied') : 'تم نسخ الصورة إلى الحافظة!');
+      const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+      if (window.utils) window.utils.showToast(isAr ? 'تم نسخ الصورة إلى الحافظة! 🖼️' : 'Copied image to clipboard!');
       return true;
     } catch (err) {
       console.warn('Failed to copy image to clipboard:', err);
-      // Fallback
       if (window.utils) window.utils.showToast('تعذر نسخ الصورة مباشرة، جاري فتحها للتحميل...', 'warning');
       window.open(imageUrl, '_blank');
+      return false;
+    }
+  },
+
+  // Copy Both Text and Image Together (Rich HTML + Embedded Image)
+  async copyCombined(text, imageUrl, title = '') {
+    try {
+      const cleanText = (text || '').trim();
+      const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        return await this.copyText(`${cleanText}\n\n[صورة: ${title || 'مرفق'}]`);
+      }
+
+      // Rich HTML snippet: styled paragraph with embedded responsive image
+      const escape = window.escapeHtml || (s => s);
+      const formattedText = escape(cleanText).replace(/\n/g, '<br>');
+      const htmlSnippet = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; line-height:1.6; color:#1e293b; max-width:600px;">
+        ${cleanText ? `<p style="font-size:15px; margin-bottom:12px; font-weight:500;">${formattedText}</p>` : ''}
+        ${imageUrl ? `<img src="${imageUrl}" alt="${escape(title || 'image')}" style="max-width:100%; height:auto; border-radius:8px; border:1px solid #e2e8f0; display:block;" />` : ''}
+      </div>`;
+
+      const plainSnippet = cleanText ? `${cleanText}\n\n[صورة: ${title || 'مرفق'}]` : `[صورة: ${title || 'مرفق'}]`;
+
+      const clipboardData = {
+        'text/html': new Blob([htmlSnippet], { type: 'text/html' }),
+        'text/plain': new Blob([plainSnippet], { type: 'text/plain' })
+      };
+
+      // Try adding PNG blob representation
+      try {
+        const pngBlob = await this.urlToPngBlob(imageUrl);
+        if (pngBlob) {
+          clipboardData['image/png'] = pngBlob;
+        }
+      } catch (e) {}
+
+      try {
+        await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
+      } catch (writeErr) {
+        // Fallback: if browser prohibits image/png with text/html in the same item, write text/html + text/plain
+        delete clipboardData['image/png'];
+        await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
+      }
+
+      if (window.utils) {
+        window.utils.showToast(isAr ? 'تم نسخ النص والصورة معاً! 📋' : 'Copied text & image together!');
+      }
+      return true;
+    } catch (err) {
+      console.warn('Failed to copy combined:', err);
+      // Resilient fallback: copy text
+      if (text) {
+        await this.copyText(text);
+        if (window.utils) window.utils.showToast('تم نسخ النص بنجاح!');
+        return true;
+      }
       return false;
     }
   },

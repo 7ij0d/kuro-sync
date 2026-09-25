@@ -78,19 +78,46 @@ const KuroSupabase = {
     }
   },
 
+  getCachedItems() {
+    try {
+      const raw = localStorage.getItem('kuro_cached_supabase_items');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  setCachedItems(items) {
+    try {
+      if (Array.isArray(items)) {
+        localStorage.setItem('kuro_cached_supabase_items', JSON.stringify(items));
+      }
+    } catch (e) {}
+  },
+
   // 1. Get Items
   async getItems(params = {}) {
     const isTrash = params.trash === '1';
 
     // Fetch all Kuro Sync items from settings table
-    const rows = await this.request('/settings?key=like.ks_item_*&select=*');
+    let rows = [];
+    try {
+      rows = await this.request('/settings?key=like.ks_item_*&select=*');
+    } catch (err) {
+      console.warn('Supabase fetch failed, trying local cache:', err);
+      const cached = this.getCachedItems();
+      if (cached && Array.isArray(cached)) {
+        rows = cached.map(v => ({ key: 'ks_item_' + v.id, value: v }));
+      } else {
+        throw err;
+      }
+    }
+
     let items = (Array.isArray(rows) ? rows : []).map(r => r.value).filter(Boolean);
 
-    // If completely empty on first visit, seed initial sample items to Supabase
-    if (items.length === 0 && !isTrash && !params.search && (!params.type || params.type === 'all')) {
-      await this.seedInitialSamples().catch(() => {});
-      const refreshedRows = await this.request('/settings?key=like.ks_item_*&select=*').catch(() => []);
-      items = (Array.isArray(refreshedRows) ? refreshedRows : []).map(r => r.value).filter(Boolean);
+    // Save active items to local cache for instant SWR loading on next visit
+    if (!isTrash && !params.search && (!params.type || params.type === 'all')) {
+      this.setCachedItems(items.filter(i => !i.deleted_at));
     }
 
     // Filter by Trash vs Active
@@ -233,52 +260,7 @@ const KuroSupabase = {
     return { success: true };
   },
 
-  // Seed default sample items for dental students
-  async seedInitialSamples() {
-    const samples = [
-      {
-        id: 'ks_sample_1',
-        type: 'image',
-        title: 'Tooth development - Bell stage',
-        content: 'Key histological landmarks:\n- Enamel organ\n- Dental papilla\n- Dental follicle\n- Stellate reticulum',
-        file_name: 'tooth_bell_stage.svg',
-        file_path: './assets/samples/histology_bell_stage.svg',
-        file_size: 1024 * 780,
-        device_name: 'iPad Pro',
-        device_type: 'ipad',
-        is_favorite: 1,
-        created_at: new Date(Date.now() - 3600000).toISOString()
-      },
-      {
-        id: 'ks_sample_2',
-        type: 'file',
-        title: 'Pathology.pdf',
-        content: 'General Dental Pathology summary and study guidelines.',
-        file_name: 'Pathology.pdf',
-        file_path: './assets/samples/Pathology.pdf',
-        file_size: 2.4 * 1024 * 1024,
-        device_name: 'iPad Pro',
-        device_type: 'ipad',
-        is_favorite: 0,
-        created_at: new Date(Date.now() - 7200000).toISOString()
-      },
-      {
-        id: 'ks_sample_3',
-        type: 'text',
-        title: 'Operative Dentistry Notes',
-        content: 'Cavity preparation principles:\n1. Outline form and initial depth\n2. Primary retention form\n3. Primary resistance form\n4. Convenience form\n5. Removal of remaining carious dentin\n6. Secondary retention & resistance form\n7. Finishing enamel walls\n8. Cleansing & debridement',
-        file_size: 260,
-        device_name: 'Windows Laptop',
-        device_type: 'laptop',
-        is_favorite: 1,
-        created_at: new Date(Date.now() - 10800000).toISOString()
-      }
-    ];
 
-    for (const item of samples) {
-      await this.createItem(item).catch(() => {});
-    }
-  },
 
   detectDeviceName() {
     const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
