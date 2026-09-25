@@ -89,8 +89,8 @@ function openItemViewer(itemId) {
     }
 
     bodyEl.innerHTML = `
-        <div style="max-height:520px; width:100%; overflow:auto; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; padding:12px; position:relative;">
-          <img id="viewer-main-img" src="${fileUrl}" alt="${item.title}" style="max-width:100%; max-height:480px; width:auto; height:auto; object-fit:contain; border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(0,0,0,0.06); cursor:zoom-in; transition:transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);" onclick="toggleViewerImageZoom(this)" title="اضغط للتكبير والتصغير 🔍" />
+        <div class="viewer-img-wrapper" style="min-height:360px; max-height:70vh; width:100%; overflow:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; padding:12px; position:relative;">
+          <img id="viewer-main-img" src="${fileUrl}" alt="${item.title}" style="width:100%; max-width:100%; max-height:66vh; height:auto; object-fit:contain; border-radius:var(--radius-md); box-shadow:0 4px 20px rgba(0,0,0,0.08); cursor:zoom-in; transition:all 0.25s var(--spring);" onclick="toggleViewerImageZoom(this)" title="اضغط للتكبير والتصغير 🔍" />
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%;">
           <button class="btn-secondary" onclick="openFullImageWindow('${item.id}')" title="فتح الصورة الأصلية بدقتها الكاملة في نافذة جديدة">
@@ -493,18 +493,27 @@ function openViewerShare() {
 
 function toggleViewerImageZoom(img) {
   if (!img) return;
+  const wrapper = img.closest('.viewer-img-wrapper') || img.parentElement;
   if (img.classList.contains('is-zoomed')) {
     img.classList.remove('is-zoomed');
-    img.style.maxHeight = '480px';
+    img.style.width = '100%';
     img.style.maxWidth = '100%';
-    img.style.transform = 'scale(1)';
+    img.style.maxHeight = '66vh';
     img.style.cursor = 'zoom-in';
+    if (wrapper) {
+      wrapper.style.display = 'flex';
+      wrapper.style.justifyContent = 'center';
+    }
   } else {
     img.classList.add('is-zoomed');
-    img.style.maxHeight = 'none';
+    img.style.width = 'auto';
     img.style.maxWidth = 'none';
-    img.style.transform = 'scale(1.5)';
+    img.style.maxHeight = 'none';
     img.style.cursor = 'zoom-out';
+    if (wrapper) {
+      wrapper.style.display = 'block';
+      wrapper.style.textAlign = 'center';
+    }
   }
 }
 
