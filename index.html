@@ -368,6 +368,11 @@
             <div style="font-size:0.75rem; color:var(--text-muted);">PDF, Images, DOCX, PPTX, TXT up to 500 MB</div>
             <input type="file" id="new-file-input" style="display:none;" onchange="handleFileSelected(this, 'file')" />
           </label>
+          <div style="display:flex; justify-content:center; margin-top:10px;">
+            <button type="button" class="btn-secondary" style="font-size:0.8125rem; gap:6px; padding:6px 14px;" onclick="pasteFileFromClipboard()">
+              📋 لصق ملف من الحافظة (أو اضغط Ctrl+V)
+            </button>
+          </div>
           <div id="file-selection-info" style="display:none; margin-top:12px; padding:10px 14px; background:var(--bg-surface-subtle); border-radius:var(--radius-md); border:1px solid var(--border-subtle); font-size:0.875rem; font-weight:600;"></div>
         </div>
 
@@ -383,6 +388,11 @@
             <div style="font-size:0.75rem; color:var(--text-muted);">PNG, JPG, WEBP, SVG</div>
             <input type="file" id="new-image-input" accept="image/*" style="display:none;" onchange="handleFileSelected(this, 'image')" />
           </label>
+          <div style="display:flex; justify-content:center; margin-top:10px;">
+            <button type="button" class="btn-secondary" style="font-size:0.8125rem; gap:6px; padding:6px 14px;" onclick="pasteImageFromClipboard()">
+              📋 لصق صورة من الحافظة (أو اضغط Ctrl+V)
+            </button>
+          </div>
           <div id="image-selection-preview" style="display:none; margin-top:12px; text-align:center;">
             <img id="image-preview-img" style="max-height:160px; max-width:100%; border-radius:var(--radius-md); border:1px solid var(--border-subtle); object-fit:contain;" />
             <div id="image-selection-info" style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;"></div>

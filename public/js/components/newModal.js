@@ -1,11 +1,13 @@
 // ==========================================================
-// KURO SYNC + NEW CAPTURE MODAL
+// KURO SYNC + NEW CAPTURE MODAL (WITH PASTE SUPPORT)
 // ==========================================================
 
 let currentNewTab = 'text';
+let currentModalFile = null;
 
 function openNewModal(tab = 'text') {
   currentNewTab = tab;
+  currentModalFile = null;
   const modal = document.getElementById('new-item-modal');
   if (!modal) return;
 
@@ -56,35 +58,140 @@ function switchNewTab(tab) {
   }, 50);
 }
 
-// Handle file/image selected from picker
+// Set image file and render preview
+function setImageFile(file) {
+  currentModalFile = file;
+  const previewContainer = document.getElementById('image-selection-preview');
+  const imgEl = document.getElementById('image-preview-img');
+  const infoEl = document.getElementById('image-selection-info');
+
+  if (previewContainer && imgEl) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imgEl.src = e.target.result;
+      previewContainer.style.display = 'block';
+      if (infoEl) {
+        infoEl.innerHTML = `🖼️ <b>${escapeHtml(file.name)}</b> <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">(${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})</span>`;
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// Set document file and render info
+function setDocumentFile(file) {
+  currentModalFile = file;
+  const infoEl = document.getElementById('file-selection-info');
+  if (infoEl) {
+    infoEl.style.display = 'block';
+    infoEl.innerHTML = `📄 <b>${escapeHtml(file.name)}</b> <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">(${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})</span>`;
+  }
+}
+
+// Handle file/image selected from input picker
 function handleFileSelected(input, type) {
   const file = input && input.files ? input.files[0] : null;
   if (!file) return;
 
   if (type === 'file') {
-    const infoEl = document.getElementById('file-selection-info');
-    if (infoEl) {
-      infoEl.style.display = 'block';
-      infoEl.innerHTML = `📄 <b>${escapeHtml(file.name)}</b> <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">(${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})</span>`;
-    }
+    setDocumentFile(file);
   } else if (type === 'image') {
-    const previewContainer = document.getElementById('image-selection-preview');
-    const imgEl = document.getElementById('image-preview-img');
-    const infoEl = document.getElementById('image-selection-info');
-
-    if (previewContainer && imgEl) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        imgEl.src = e.target.result;
-        previewContainer.style.display = 'block';
-        if (infoEl) {
-          infoEl.textContent = `${file.name} (${window.utils ? window.utils.formatBytes(file.size) : file.size + ' B'})`;
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    setImageFile(file);
   }
 }
+
+// Paste Image from Clipboard button
+async function pasteImageFromClipboard() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      if (window.utils) window.utils.showToast('اضغط Ctrl+V للصق الصورة مباشرة من الحافظة', 'info');
+      return;
+    }
+
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.startsWith('image/')) {
+          const blob = await item.getType(type);
+          const ext = type.split('/')[1] || 'png';
+          const file = new File([blob], `pasted_image_${Date.now()}.${ext}`, { type });
+          setImageFile(file);
+          if (window.utils) window.utils.showToast('تم التقاط ولصق الصورة بنجاح!');
+          return;
+        }
+      }
+    }
+    if (window.utils) window.utils.showToast('لا توجد صورة منسوخة في الحافظة. اضغط Ctrl+C ثم جرب ثانية', 'warning');
+  } catch (err) {
+    if (window.utils) window.utils.showToast('اضغط Ctrl+V داخل النافذة للصق الصورة مباشرة', 'info');
+  }
+}
+
+// Paste File from Clipboard button
+async function pasteFileFromClipboard() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      if (window.utils) window.utils.showToast('اضغط Ctrl+V للصق الملف من الحافظة', 'info');
+      return;
+    }
+
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type === 'application/pdf' || type.startsWith('application/')) {
+          const blob = await item.getType(type);
+          const file = new File([blob], `pasted_document_${Date.now()}.pdf`, { type });
+          setDocumentFile(file);
+          if (window.utils) window.utils.showToast('تم التقاط ولصق الملف بنجاح!');
+          return;
+        }
+      }
+    }
+    if (window.utils) window.utils.showToast('اضغط Ctrl+V داخل النافذة للصق الملف مباشرة', 'info');
+  } catch (err) {
+    if (window.utils) window.utils.showToast('اضغط Ctrl+V للصق الملف مباشرة', 'info');
+  }
+}
+
+// Setup Paste Listener on the modal
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('new-item-modal');
+  if (modal) {
+    modal.addEventListener('paste', (e) => {
+      // Don't intercept if user is typing text in text tab
+      if (currentNewTab === 'text' && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      const clipboardData = e.clipboardData || window.clipboardData;
+      if (!clipboardData) return;
+
+      const items = clipboardData.items;
+      if (!items || items.length === 0) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (file.type.startsWith('image/')) {
+              switchNewTab('image');
+              setImageFile(file);
+              if (window.utils) window.utils.showToast('تم لصق الصورة المنسوخة بنجاح!');
+            } else {
+              switchNewTab('file');
+              setDocumentFile(file);
+              if (window.utils) window.utils.showToast('تم لصق الملف بنجاح!');
+            }
+            return;
+          }
+        }
+      }
+    });
+  }
+});
 
 function populateFolderSelect() {
   const select = document.getElementById('new-item-folder');
@@ -102,6 +209,7 @@ function populateFolderSelect() {
 }
 
 function resetNewForm() {
+  currentModalFile = null;
   const textTitle = document.getElementById('new-text-title');
   const textContent = document.getElementById('new-text-content');
   const linkUrl = document.getElementById('new-link-url');
@@ -181,9 +289,9 @@ async function submitNewItem() {
       window.refreshItems();
     } else if (currentNewTab === 'file') {
       const fileInput = document.getElementById('new-file-input');
-      const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+      const file = currentModalFile || (fileInput && fileInput.files ? fileInput.files[0] : null);
       if (!file) {
-        if (window.utils) window.utils.showToast('Please select a file to upload', 'warning');
+        if (window.utils) window.utils.showToast('Please select or paste a file to upload', 'warning');
         return;
       }
 
@@ -194,9 +302,9 @@ async function submitNewItem() {
       window.refreshItems();
     } else if (currentNewTab === 'image') {
       const imageInput = document.getElementById('new-image-input');
-      const file = imageInput && imageInput.files ? imageInput.files[0] : null;
+      const file = currentModalFile || (imageInput && imageInput.files ? imageInput.files[0] : null);
       if (!file) {
-        if (window.utils) window.utils.showToast('Please select an image to upload', 'warning');
+        if (window.utils) window.utils.showToast('Please select or paste an image to upload', 'warning');
         return;
       }
 
@@ -225,16 +333,8 @@ function handleDuplicateModal(existingItem, tab) {
         closeNewModal();
         window.refreshItems();
       });
-    } else if (tab === 'file') {
-      const file = document.getElementById('new-file-input').files[0];
-      if (file) {
-        window.api.uploadFile(file, null, true).then(() => {
-          closeNewModal();
-          window.refreshItems();
-        });
-      }
-    } else if (tab === 'image') {
-      const file = document.getElementById('new-image-input').files[0];
+    } else if (tab === 'file' || tab === 'image') {
+      const file = currentModalFile || (document.getElementById('new-file-input').files[0]);
       if (file) {
         window.api.uploadFile(file, null, true).then(() => {
           closeNewModal();
@@ -249,5 +349,7 @@ window.openNewModal = openNewModal;
 window.closeNewModal = closeNewModal;
 window.switchNewTab = switchNewTab;
 window.handleFileSelected = handleFileSelected;
+window.pasteImageFromClipboard = pasteImageFromClipboard;
+window.pasteFileFromClipboard = pasteFileFromClipboard;
 window.handleReadClipboardIntoModal = handleReadClipboardIntoModal;
 window.submitNewItem = submitNewItem;
