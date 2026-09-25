@@ -2,20 +2,31 @@
 // KURO SYNC CARD COMPONENT (Matches Reference UI Exactly)
 // ==========================================================
 
-// Safe helper to extract file/image URL from any item format
+// Safe helper to extract FULL high-resolution image/file URL
 function getItemFileUrl(item) {
   if (!item) return '';
-  if (item.thumbnail && typeof item.thumbnail === 'string') return item.thumbnail;
   let p = item.file_path;
   if (p && typeof p === 'object' && p.dataUrl) p = p.dataUrl;
-  if (typeof p === 'string') {
-    if (p.startsWith('data:') || p.startsWith('http') || p.startsWith('./') || p.startsWith('blob:') || p.startsWith('assets') || p.startsWith('/')) {
-      return p;
-    }
+  if (typeof p === 'string' && (p.startsWith('data:') || p.startsWith('http') || p.startsWith('./') || p.startsWith('blob:') || p.startsWith('assets') || p.startsWith('/'))) {
+    return p;
+  }
+  // Fallback to thumbnail only if full image is not available
+  if (item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('data:')) {
+    return item.thumbnail;
   }
   return item.id ? `/api/items/${item.id}/file` : '';
 }
 window.getItemFileUrl = getItemFileUrl;
+
+// Helper to extract low-res thumbnail ONLY for small feed card icons
+function getItemThumbnailUrl(item) {
+  if (!item) return '';
+  if (item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('data:')) {
+    return item.thumbnail;
+  }
+  return getItemFileUrl(item);
+}
+window.getItemThumbnailUrl = getItemThumbnailUrl;
 
 function renderItemCard(item, currentView = 'all') {
   if (!item) return '';
@@ -25,7 +36,7 @@ function renderItemCard(item, currentView = 'all') {
   // Media / Icon thumbnail box
   let mediaHtml = '';
   if (item.type === 'image') {
-    let imgUrl = getItemFileUrl(item);
+    let imgUrl = getItemThumbnailUrl(item);
     if (!imgUrl) {
       imgUrl = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
     }

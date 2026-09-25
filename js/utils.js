@@ -121,7 +121,7 @@ const utils = {
   },
 
   // Compress and resize images client-side for lightning-fast cloud sync
-  compressImage(file, maxWidth = 1400, quality = 0.82) {
+  compressImage(file, maxWidth = 2048, quality = 0.90) {
     return new Promise((resolve) => {
       if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
         const reader = new FileReader();
@@ -153,9 +153,14 @@ const utils = {
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          let dataUrl = canvas.toDataURL('image/webp', quality);
+          if (!dataUrl || !dataUrl.startsWith('data:image/webp')) {
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
           const compressedSize = Math.round((dataUrl.length - 23) * 0.75);
           resolve({ dataUrl, size: compressedSize });
         };

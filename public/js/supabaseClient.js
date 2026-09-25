@@ -109,12 +109,9 @@ const KuroSupabase = {
         let fp = copy.file_path;
         if (fp && typeof fp === 'object' && fp.dataUrl) fp = fp.dataUrl;
         if (typeof fp === 'string') {
-          if (fp.length > 5000) {
-            if (copy.thumbnail && typeof copy.thumbnail === 'string') {
-              copy.file_path = copy.thumbnail;
-            } else {
-              delete copy.file_path;
-            }
+          // Keep high-res file_path intact (up to 800KB) - NEVER overwrite with thumbnail!
+          if (fp.length > 800000) {
+            delete copy.file_path;
           } else {
             copy.file_path = fp;
           }

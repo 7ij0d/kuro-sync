@@ -70,14 +70,32 @@ function openItemViewer(itemId) {
       });
     }
   } else if (item.type === 'image') {
-    const fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
+    let fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
+
+    // If only thumbnail is present in memory, immediately fetch full high-res from Supabase
+    if ((!fileUrl || (item.thumbnail && fileUrl === item.thumbnail)) && window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+      window.KuroSupabase.request(`/settings?key=eq.ks_item_${item.id}&select=*`).then(rows => {
+        if (rows && rows[0]) {
+          const val = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+          if (val && val.file_path) {
+            item.file_path = (val.file_path && typeof val.file_path === 'object' && val.file_path.dataUrl) ? val.file_path.dataUrl : val.file_path;
+            const imgEl = document.getElementById('viewer-main-img');
+            if (imgEl && typeof item.file_path === 'string') {
+              imgEl.src = item.file_path;
+            }
+          }
+        }
+      }).catch(() => {});
+    }
 
     bodyEl.innerHTML = `
-      <div style="display:flex; flex-direction:column; align-items:center; gap:16px;">
-        <div style="max-height:420px; width:100%; overflow:hidden; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center;">
-          <img src="${fileUrl}" alt="${item.title}" style="max-width:100%; max-height:420px; object-fit:contain;" />
+        <div style="max-height:520px; width:100%; overflow:auto; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; padding:12px; position:relative;">
+          <img id="viewer-main-img" src="${fileUrl}" alt="${item.title}" style="max-width:100%; max-height:480px; width:auto; height:auto; object-fit:contain; border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(0,0,0,0.06); cursor:zoom-in; transition:transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);" onclick="toggleViewerImageZoom(this)" title="اضغط للتكبير والتصغير 🔍" />
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%;">
+          <button class="btn-secondary" onclick="openFullImageWindow('${item.id}')" title="فتح الصورة الأصلية بدقتها الكاملة في نافذة جديدة">
+            🔍 الحجم الكامل
+          </button>
           <button class="btn-card-action" onclick="copyCardImage('${item.id}', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -473,8 +491,82 @@ function openViewerShare() {
   window.openShareModal(activeViewerItem.id);
 }
 
+function toggleViewerImageZoom(img) {
+  if (!img) return;
+  if (img.classList.contains('is-zoomed')) {
+    img.classList.remove('is-zoomed');
+    img.style.maxHeight = '480px';
+    img.style.maxWidth = '100%';
+    img.style.transform = 'scale(1)';
+    img.style.cursor = 'zoom-in';
+  } else {
+    img.classList.add('is-zoomed');
+    img.style.maxHeight = 'none';
+    img.style.maxWidth = 'none';
+    img.style.transform = 'scale(1.5)';
+    img.style.cursor = 'zoom-out';
+  }
+}
+
+function openFullImageWindow(itemId) {
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId)) || activeViewerItem;
+  if (!item) return;
+  const url = window.getItemFileUrl ? window.getItemFileUrl(item) : (item.file_path || item.thumbnail);
+  if (!url) return;
+
+  const win = window.open('');
+  if (win) {
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${window.escapeHtml ? window.escapeHtml(item.title || 'Image') : (item.title || 'Image')} - Kuro Sync</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 24px;
+            background: #111113;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+          }
+          .img-frame {
+            max-width: 100%;
+            overflow: auto;
+            text-align: center;
+          }
+          img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+            display: block;
+            margin: 0 auto;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="img-frame">
+          <img src="${url}" alt="${window.escapeHtml ? window.escapeHtml(item.title || 'Full Resolution Image') : 'Image'}" />
+        </div>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  }
+}
+
 window.openItemViewer = openItemViewer;
 window.closeItemViewer = closeItemViewer;
+window.toggleViewerImageZoom = toggleViewerImageZoom;
+window.openFullImageWindow = openFullImageWindow;
 window.copyViewerText = copyViewerText;
 window.copyViewerNotes = copyViewerNotes;
 window.copyViewerCombined = copyViewerCombined;

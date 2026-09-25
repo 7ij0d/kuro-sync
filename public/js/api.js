@@ -457,14 +457,14 @@ const api = {
       let thumbPath = '';
       if (isImg && window.compressImage) {
         try {
-          const comp = await window.compressImage(file, 1400, 0.82);
+          const comp = await window.compressImage(file, 2048, 0.90);
           processedPath = (comp && comp.dataUrl) ? comp.dataUrl : (typeof comp === 'string' ? comp : '');
           processedSize = (comp && comp.size) ? comp.size : file.size;
         } catch (e) {
           console.warn('Image compression fallback:', e);
         }
         try {
-          const thumbComp = await window.compressImage(file, 120, 0.6);
+          const thumbComp = await window.compressImage(file, 160, 0.7);
           thumbPath = (thumbComp && thumbComp.dataUrl) ? thumbComp.dataUrl : (typeof thumbComp === 'string' ? thumbComp : '');
         } catch (e) {}
       }
