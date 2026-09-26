@@ -50,7 +50,7 @@ const LocalKuroStore = {
 };
 
 const api = {
-  isStaticHost: window.location.hostname.endsWith('github.io'),
+  isStaticHost: true,
 
   getToken() {
     return localStorage.getItem('kuro_sync_token');
@@ -437,6 +437,13 @@ const api = {
 
   // Items
   async getItems(params = {}) {
+    if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+      try {
+        return await window.KuroSupabase.getItems(params);
+      } catch (err) {
+        console.warn('Supabase getItems direct error, falling back:', err);
+      }
+    }
     const query = new URLSearchParams(params).toString();
     return this.request(`/api/items?${query}`);
   },

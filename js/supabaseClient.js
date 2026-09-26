@@ -101,7 +101,7 @@ const KuroSupabase = {
   setCachedItems(items) {
     try {
       if (!Array.isArray(items)) return;
-      // Ultra-lightweight cache: keeps metadata, notes, and tiny thumbnails (< 30KB total)
+      // Ultra-lightweight cache: keeps metadata, notes, and tiny thumbnails (< 70KB each)
       // Never exceeds localStorage quota and loads in 0.0001 seconds
       const lightweight = items.map(item => {
         if (!item) return null;
@@ -109,8 +109,8 @@ const KuroSupabase = {
         let fp = copy.file_path;
         if (fp && typeof fp === 'object' && fp.dataUrl) fp = fp.dataUrl;
         if (typeof fp === 'string') {
-          // Keep high-res file_path intact (up to 800KB) - NEVER overwrite with thumbnail!
-          if (fp.length > 800000) {
+          // If large dataUrl, strip from local cache to prevent quota error; keep thumbnail
+          if (fp.length > 70000) {
             delete copy.file_path;
           } else {
             copy.file_path = fp;
@@ -126,13 +126,27 @@ const KuroSupabase = {
               name: img.name,
               size: img.size,
               thumbnail: img.thumbnail || '',
-              url: (img.url && img.url.length < 500000) ? img.url : (img.thumbnail || '')
+              url: (img.url && img.url.length < 70000) ? img.url : (img.thumbnail || '')
             };
           }).filter(Boolean);
         }
         return copy;
       }).filter(Boolean);
-      localStorage.setItem('kuro_cached_supabase_items', JSON.stringify(lightweight));
+
+      try {
+        localStorage.setItem('kuro_cached_supabase_items', JSON.stringify(lightweight));
+      } catch (quotaErr) {
+        // Fallback: strip any remaining heavy fields and save
+        const ultraCompact = lightweight.map(i => {
+          const c = { ...i };
+          delete c.file_path;
+          if (c.images) {
+            c.images = c.images.map(img => ({ id: img.id, name: img.name, size: img.size, thumbnail: img.thumbnail }));
+          }
+          return c;
+        });
+        localStorage.setItem('kuro_cached_supabase_items', JSON.stringify(ultraCompact));
+      }
     } catch (e) {
       console.warn('localStorage setCachedItems error:', e);
     }

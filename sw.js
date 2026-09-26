@@ -1,8 +1,8 @@
 // ==========================================================
-// KURO SYNC SERVICE WORKER (v12 - Network First)
+// KURO SYNC SERVICE WORKER (v13 - Network First)
 // ==========================================================
 
-const CACHE_NAME = 'kuro-sync-v12';
+const CACHE_NAME = 'kuro-sync-v13';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

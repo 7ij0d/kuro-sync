@@ -22,6 +22,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cachedItems && Array.isArray(cachedItems) && cachedItems.length > 0) {
       window.currentItems = cachedItems;
       renderItemsFeed(cachedItems);
+      if (window.updateSidebarBadges) {
+        window.updateSidebarBadges({
+          all: cachedItems.length,
+          text: cachedItems.filter(i => i.type === 'text' || i.type === 'note').length,
+          images: cachedItems.filter(i => i.type === 'image').length,
+          files: cachedItems.filter(i => i.type === 'file').length,
+          links: cachedItems.filter(i => i.type === 'link').length,
+          clipboard: cachedItems.filter(i => i.type === 'clipboard').length,
+          favorites: cachedItems.filter(i => Boolean(i.is_favorite)).length,
+          trash: 0
+        });
+      }
     }
   } catch (e) {}
 
@@ -39,7 +51,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.setupHeaderControls) window.setupHeaderControls();
   setupDragAndDrop();
 
-  // 5. Check URL parameters (e.g. ?pair=KXXXXX)
+  // 5. Fire concurrent background sync immediately without blocking UI
+  refreshFolders();
+  refreshItems();
+
+  // 6. Check URL parameters (e.g. ?pair=KXXXXX)
   const urlParams = new URLSearchParams(window.location.search);
   const pairCode = urlParams.get('pair');
   if (pairCode) {
@@ -52,10 +68,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 6. Check Auth Session
-  await bootstrapSession();
+  // 7. Check Auth Session
+  bootstrapSession();
 
-  // 7. Setup Realtime Listener
+  // 8. Setup Realtime Listener
   window.addEventListener('kuro_realtime_event', (e) => {
     handleRealtimeEvent(e.detail);
   });
@@ -67,38 +83,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Bootstrap or auto-create demo session
 async function bootstrapSession() {
-  const token = window.api.getToken();
-  if (!token) {
-    // Automatically create instant sandbox workspace for immediate testing
-    try {
-      await window.api.instantDemo();
-    } catch (e) {
-      console.warn('Instant demo fallback:', e);
-    }
-  }
-
   try {
-    const meData = await window.api.getMe();
-    window.currentUser = meData.user;
-    window.currentDevices = meData.devices;
-
-    // Update UI profile
-    const profileName = document.getElementById('user-profile-name');
-    if (profileName) profileName.textContent = meData.user.name;
-
-    // Connect WebSocket
-    if (window.realtime) window.realtime.connect();
-
-    // Load Items & Folders asynchronously without blocking UI paint
-    refreshFolders();
-    refreshItems();
-    if (window.updateDeviceFilterOptions) {
-      window.updateDeviceFilterOptions(meData.devices, meData.currentDeviceId);
+    const token = window.api.getToken();
+    if (!token) {
+      await window.api.instantDemo().catch(() => {});
     }
+
+    const meData = await window.api.getMe().catch(() => null);
+    if (meData && meData.user) {
+      window.currentUser = meData.user;
+      window.currentDevices = meData.devices;
+
+      const profileName = document.getElementById('user-profile-name');
+      if (profileName) profileName.textContent = meData.user.name;
+
+      if (window.updateDeviceFilterOptions) {
+        window.updateDeviceFilterOptions(meData.devices, meData.currentDeviceId);
+      }
+    }
+
+    // Connect Realtime
+    if (window.realtime) window.realtime.connect();
   } catch (err) {
     console.warn('Session bootstrap error:', err);
-    // Show auth modal if session invalid
-    if (window.openAuthModal) window.openAuthModal('login');
   }
 }
 
@@ -133,6 +140,22 @@ async function refreshItems() {
 
   if (window.currentSearchTerm) {
     params.search = window.currentSearchTerm;
+  }
+
+  // If no items are rendered yet, ensure loading skeleton is shown
+  if ((!window.currentItems || window.currentItems.length === 0) && !itemsContainer.querySelector('.feed-sync-skeleton') && !itemsContainer.querySelector('.item-card')) {
+    const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+    itemsContainer.innerHTML = `
+      <div class="feed-sync-skeleton" id="initial-feed-skeleton">
+        <div class="skeleton-sync-header">
+          <span class="skeleton-spinner"></span>
+          <span>${isAr ? 'جاري المزامنة مع سحابة Kuro Sync وتحميل العناصر...' : 'Syncing items with Kuro Cloud...'}</span>
+        </div>
+        <div class="skeleton-card-ghost shimmer"></div>
+        <div class="skeleton-card-ghost shimmer"></div>
+        <div class="skeleton-card-ghost shimmer"></div>
+      </div>
+    `;
   }
 
   try {
