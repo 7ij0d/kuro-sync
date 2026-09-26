@@ -118,6 +118,18 @@ const KuroSupabase = {
         } else {
           delete copy.file_path;
         }
+        if (copy.images && Array.isArray(copy.images)) {
+          copy.images = copy.images.map(img => {
+            if (!img) return null;
+            return {
+              id: img.id,
+              name: img.name,
+              size: img.size,
+              thumbnail: img.thumbnail || '',
+              url: (img.url && img.url.length < 500000) ? img.url : (img.thumbnail || '')
+            };
+          }).filter(Boolean);
+        }
         return copy;
       }).filter(Boolean);
       localStorage.setItem('kuro_cached_supabase_items', JSON.stringify(lightweight));
@@ -155,6 +167,14 @@ const KuroSupabase = {
           val.file_path = val.file_path.dataUrl;
         } else if (val.file_path && typeof val.file_path === 'object') {
           val.file_path = '';
+        }
+        if (val.images && Array.isArray(val.images)) {
+          val.images = val.images.map(img => {
+            if (!img) return null;
+            if (typeof img === 'string') return { id: 'img-' + Date.now(), url: img, thumbnail: img };
+            return img;
+          }).filter(Boolean);
+          val.image_count = val.images.length;
         }
       }
       return val;
@@ -226,8 +246,12 @@ const KuroSupabase = {
       content: item.content || '',
       file_name: item.file_name || null,
       file_path: item.file_path || null,
+      thumbnail: item.thumbnail || null,
+      images: Array.isArray(item.images) ? item.images : null,
+      image_count: Array.isArray(item.images) ? item.images.length : (item.image_count || 1),
       file_size: item.file_size || (item.content ? item.content.length : 100),
       mime_type: item.mime_type || null,
+      folder_id: item.folder_id || null,
       device_name: item.device_name || this.detectDeviceName(),
       device_type: item.device_type || this.detectDeviceType(),
       is_favorite: item.is_favorite ? 1 : 0,

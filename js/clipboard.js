@@ -99,54 +99,140 @@ const clipboardEngine = {
     }
   },
 
-  // Copy Both Text and Image Together (Rich HTML + Embedded Image)
-  async copyCombined(text, imageUrl, title = '') {
+  // Copy All Images to System Clipboard (HTML embed with high-res images + binary PNG)
+  async copyAllImages(images, title = '') {
+    try {
+      if (!images || !Array.isArray(images) || images.length === 0) {
+        if (window.utils) window.utils.showToast('لا توجد صور لنسخها', 'warning');
+        return false;
+      }
+
+      const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+
+      // Normalize images
+      const validImages = images.map((img, idx) => {
+        if (!img) return null;
+        if (typeof img === 'string') return { url: img, name: `Image ${idx + 1}` };
+        return { url: img.url || img.thumbnail, name: img.name || `Image ${idx + 1}` };
+      }).filter(i => Boolean(i && i.url));
+
+      if (validImages.length === 0) {
+        if (window.utils) window.utils.showToast('لا توجد صور صالحة للنسخ', 'warning');
+        return false;
+      }
+
+      const escape = window.escapeHtml || (s => s);
+      const titleHtml = title ? `<h3 style="font-family:system-ui,-apple-system,sans-serif; margin-bottom:14px; font-size:16px; font-weight:700; color:#1e293b;">${escape(title)}</h3>` : '';
+      const imagesHtml = validImages.map((img, i) => `
+        <div style="margin-bottom:16px; text-align:center;">
+          <img src="${img.url}" alt="${escape(img.name || `Image ${i+1}`)}" style="max-width:100%; height:auto; border-radius:8px; border:1px solid #e2e8f0; display:block; margin:0 auto; box-shadow:0 2px 8px rgba(0,0,0,0.08);" />
+          <div style="font-size:11px; color:#64748b; margin-top:4px; font-family:sans-serif;">${escape(img.name || `صورة ${i+1}`)}</div>
+        </div>
+      `).join('');
+
+      const fullHtml = `<div style="font-family:system-ui,-apple-system,sans-serif; line-height:1.6; max-width:800px;">
+        ${titleHtml}
+        ${imagesHtml}
+      </div>`;
+
+      const plainText = `${title ? title + '\n\n' : ''}[${validImages.length} ${isAr ? 'صور منسوخة' : 'images copied'}]`;
+
+      const clipboardData = {
+        'text/html': new Blob([fullHtml], { type: 'text/html' }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' })
+      };
+
+      try {
+        const firstBlob = await this.urlToPngBlob(validImages[0].url);
+        if (firstBlob) clipboardData['image/png'] = firstBlob;
+      } catch (e) {}
+
+      try {
+        if (!navigator.clipboard || !window.ClipboardItem) throw new Error('ClipboardItem unsupported');
+        await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
+      } catch (writeErr) {
+        delete clipboardData['image/png'];
+        await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
+      }
+
+      if (window.utils) {
+        window.utils.showToast(isAr ? `تم نسخ جميع الصور (${validImages.length}) بنجاح! 🖼️` : `Copied all ${validImages.length} images!`);
+      }
+      return true;
+    } catch (err) {
+      console.warn('Failed to copy all images:', err);
+      if (window.utils) window.utils.showToast('تعذر نسخ كل الصور مباشرة إلى الحافظة', 'warning');
+      return false;
+    }
+  },
+
+  // Copy Both Text and Image(s) Together (Rich HTML + Embedded Image(s))
+  async copyCombined(text, imageOrImages, title = '') {
     try {
       const cleanText = (text || '').trim();
       const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
-
-      if (!navigator.clipboard || !window.ClipboardItem) {
-        return await this.copyText(`${cleanText}\n\n[صورة: ${title || 'مرفق'}]`);
-      }
-
-      // Rich HTML snippet: styled paragraph with embedded responsive image
       const escape = window.escapeHtml || (s => s);
       const formattedText = escape(cleanText).replace(/\n/g, '<br>');
-      const htmlSnippet = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; line-height:1.6; color:#1e293b; max-width:600px;">
-        ${cleanText ? `<p style="font-size:15px; margin-bottom:12px; font-weight:500;">${formattedText}</p>` : ''}
-        ${imageUrl ? `<img src="${imageUrl}" alt="${escape(title || 'image')}" style="max-width:100%; height:auto; border-radius:8px; border:1px solid #e2e8f0; display:block;" />` : ''}
+
+      // Normalize images
+      let imageList = [];
+      if (Array.isArray(imageOrImages)) {
+        imageList = imageOrImages.map(img => {
+          if (!img) return null;
+          if (typeof img === 'string') return { url: img, name: title || 'Image' };
+          return { url: img.url || img.thumbnail, name: img.name || title || 'Image' };
+        }).filter(i => Boolean(i && i.url));
+      } else if (typeof imageOrImages === 'string' && imageOrImages) {
+        imageList = [{ url: imageOrImages, name: title || 'Image' }];
+      }
+
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        return await this.copyText(`${cleanText}\n\n[${imageList.length || 1} صورة: ${title || 'مرفق'}]`);
+      }
+
+      const imagesHtml = imageList.map((img, i) => `
+        <div style="margin-bottom:12px; text-align:center;">
+          <img src="${img.url}" alt="${escape(img.name || `Image ${i+1}`)}" style="max-width:100%; height:auto; border-radius:8px; border:1px solid #e2e8f0; display:block; margin:0 auto;" />
+        </div>
+      `).join('');
+
+      const htmlSnippet = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; line-height:1.6; color:#1e293b; max-width:700px;">
+        ${cleanText ? `<p style="font-size:15px; margin-bottom:14px; font-weight:500;">${formattedText}</p>` : ''}
+        ${imagesHtml}
       </div>`;
 
-      const plainSnippet = cleanText ? `${cleanText}\n\n[صورة: ${title || 'مرفق'}]` : `[صورة: ${title || 'مرفق'}]`;
+      const plainSnippet = cleanText 
+        ? `${cleanText}\n\n[${imageList.length} ${isAr ? 'صور مرفقة' : 'images attached'}: ${title || ''}]` 
+        : `[${imageList.length} ${isAr ? 'صور مرفقة' : 'images'}]`;
 
       const clipboardData = {
         'text/html': new Blob([htmlSnippet], { type: 'text/html' }),
         'text/plain': new Blob([plainSnippet], { type: 'text/plain' })
       };
 
-      // Try adding PNG blob representation
-      try {
-        const pngBlob = await this.urlToPngBlob(imageUrl);
-        if (pngBlob) {
-          clipboardData['image/png'] = pngBlob;
-        }
-      } catch (e) {}
+      if (imageList.length > 0) {
+        try {
+          const firstBlob = await this.urlToPngBlob(imageList[0].url);
+          if (firstBlob) clipboardData['image/png'] = firstBlob;
+        } catch (e) {}
+      }
 
       try {
         await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
       } catch (writeErr) {
-        // Fallback: if browser prohibits image/png with text/html in the same item, write text/html + text/plain
         delete clipboardData['image/png'];
         await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
       }
 
       if (window.utils) {
-        window.utils.showToast(isAr ? 'تم نسخ النص والصورة معاً! 📋' : 'Copied text & image together!');
+        const msg = imageList.length > 1
+          ? (isAr ? `تم نسخ النص وجميع الصور (${imageList.length}) معاً! 📋` : `Copied text & all ${imageList.length} images!`)
+          : (isAr ? 'تم نسخ النص والصورة معاً! 📋' : 'Copied text & image together!');
+        window.utils.showToast(msg);
       }
       return true;
     } catch (err) {
       console.warn('Failed to copy combined:', err);
-      // Resilient fallback: copy text
       if (text) {
         await this.copyText(text);
         if (window.utils) window.utils.showToast('تم نسخ النص بنجاح!');

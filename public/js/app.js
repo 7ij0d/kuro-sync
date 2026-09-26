@@ -384,9 +384,11 @@ async function copyCardImage(itemId, btn) {
 async function copyCardCombined(itemId, btn) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
-  const imgUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`);
+  const imageArg = (item.images && Array.isArray(item.images) && item.images.length > 0)
+    ? item.images
+    : (window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`));
 
-  const success = await window.clipboardEngine.copyCombined(item.content || '', imgUrl, item.title || '');
+  const success = await window.clipboardEngine.copyCombined(item.content || '', imageArg, item.title || '');
   if (success && btn) {
     const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
     const labelSpan = btn.querySelector('.btn-label') || btn;
@@ -652,6 +654,7 @@ window.selectFolder = selectFolder;
 window.copyCardText = copyCardText;
 window.copyCardImage = copyCardImage;
 window.copyCardCombined = copyCardCombined;
+window.copyAllCardImages = window.copyAllCardImages;
 window.downloadItemFile = downloadItemFile;
 window.deleteItem = deleteItem;
 window.restoreItem = restoreItem;

@@ -85,17 +85,20 @@ function openItemViewer(itemId) {
     const isMulti = item.images && Array.isArray(item.images) && item.images.length > 1;
     let fileUrl = getActiveViewerImageUrl();
 
-    // If only thumbnail is present in memory, fetch full high-res from Supabase
-    if ((!fileUrl || (item.thumbnail && fileUrl === item.thumbnail)) && window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+    // If only thumbnail is present or some high-res images are missing in memory, fetch full rows from Supabase
+    const hasMissingFullImages = item.images && Array.isArray(item.images) && item.images.some(img => !img.url || (img.thumbnail && img.url === img.thumbnail));
+    if ((!fileUrl || hasMissingFullImages || (item.thumbnail && fileUrl === item.thumbnail)) && window.KuroSupabase && window.KuroSupabase.isConfigured()) {
       window.KuroSupabase.request(`/settings?key=eq.ks_item_${item.id}&select=*`).then(rows => {
         if (rows && rows[0]) {
           const val = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
           if (val && (val.file_path || val.images)) {
             if (val.images && Array.isArray(val.images)) {
               item.images = val.images;
+              activeViewerItem.images = val.images;
             }
             if (val.file_path) {
               item.file_path = (val.file_path && typeof val.file_path === 'object' && val.file_path.dataUrl) ? val.file_path.dataUrl : val.file_path;
+              activeViewerItem.file_path = item.file_path;
             }
             const imgEl = document.getElementById('viewer-main-img');
             const targetUrl = getActiveViewerImageUrl();
@@ -125,6 +128,16 @@ function openItemViewer(itemId) {
       </div>
     ` : '';
 
+    const copyAllViewerBtn = isMulti ? `
+      <button class="btn-card-action btn-copy-all-images" onclick="copyAllViewerImages(this)" title="نسخ جميع الصور في هذه المجموعة إلى الحافظة دفعة واحدة">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <rect x="2" y="2" width="13" height="13" rx="2" ry="2"></rect>
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        </svg>
+        <span class="btn-label">📷 نسخ كل الصور (${item.images.length})</span>
+      </button>
+    ` : '';
+
     bodyEl.innerHTML = `
       <div class="viewer-img-wrapper" style="min-height:360px; max-height:70vh; width:100%; overflow:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; padding:12px; position:relative;">
         ${navArrowsHtml}
@@ -137,27 +150,28 @@ function openItemViewer(itemId) {
         <button class="btn-secondary" onclick="openFullImageWindow('${item.id}')" title="فتح الصورة الحالية بدقتها الكاملة في نافذة جديدة">
           🔍 الحجم الكامل
         </button>
-        <button class="btn-card-action" onclick="copyActiveViewerImage(this)">
+        ${copyAllViewerBtn}
+        <button class="btn-card-action" onclick="copyActiveViewerImage(this)" title="نسخ الصورة المعروضة حالياً">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
             <circle cx="8.5" cy="8.5" r="1.5"></circle>
             <polyline points="21 15 16 10 5 21"></polyline>
           </svg>
-          <span class="btn-label">${window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة'}</span>
+          <span class="btn-label">${isMulti ? 'نسخ صورة 1' : (window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة')}</span>
         </button>
-        <button class="btn-card-action" onclick="copyViewerNotes('${item.id}', this)">
+        <button class="btn-card-action" onclick="copyViewerNotes('${item.id}', this)" title="نسخ الشرح والملاحظات">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
           </svg>
           <span class="btn-label">${window.i18n ? (window.i18n.t('copyText') || 'نسخ النص') : 'نسخ النص'}</span>
         </button>
-        <button class="btn-card-action btn-card-both" onclick="copyViewerCombined('${item.id}', this)">
+        <button class="btn-card-action btn-card-both" onclick="copyViewerCombined('${item.id}', this)" title="${isMulti ? 'نسخ جميع الصور مع النص والشرح معاً' : 'نسخ الصورة مع النص والشرح معاً'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
           </svg>
-          <span class="btn-label">${window.i18n ? (window.i18n.t('copyBoth') || 'نسخ الاثنين معاً') : 'نسخ الاثنين معاً'}</span>
+          <span class="btn-label">${isMulti ? 'نسخ الكل مع النص' : (window.i18n ? (window.i18n.t('copyBoth') || 'نسخ الاثنين معاً') : 'نسخ الاثنين معاً')}</span>
         </button>
         <button class="btn-card-action" onclick="document.getElementById('viewer-replace-image-input').click()" title="استبدال أو تغيير هذه الصورة">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -388,6 +402,23 @@ async function copyActiveViewerImage(btn) {
   }
 }
 
+// Copy ALL images in the gallery to clipboard at once
+async function copyAllViewerImages(btn) {
+  if (!activeViewerItem || !activeViewerItem.images || activeViewerItem.images.length === 0) return;
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  const success = await window.clipboardEngine.copyAllImages(activeViewerItem.images, activeViewerItem.title || '');
+  if (success && btn) {
+    const label = btn.querySelector('.btn-label') || btn;
+    const old = label.textContent;
+    btn.classList.add('btn-copied');
+    label.textContent = isAr ? '✓ تم نسخ كل الصور' : '✓ Copied All';
+    setTimeout(() => {
+      btn.classList.remove('btn-copied');
+      label.textContent = old;
+    }, 2000);
+  }
+}
+
 async function downloadActiveViewerImage(itemId) {
   if (!activeViewerItem) return;
   const url = getActiveViewerImageUrl();
@@ -465,15 +496,18 @@ async function copyViewerCombined(itemId, btn) {
   if (!activeViewerItem) return;
   const editor = document.getElementById('viewer-img-notes');
   const text = editor ? editor.value : (activeViewerItem.content || '');
-  const imgUrl = getActiveViewerImageUrl();
+  
+  // If multi-image, pass full collection of images to copy all together
+  const isMulti = activeViewerItem.images && Array.isArray(activeViewerItem.images) && activeViewerItem.images.length > 1;
+  const imagesToCopy = isMulti ? activeViewerItem.images : getActiveViewerImageUrl();
 
   const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
-  const success = await window.clipboardEngine.copyCombined(text, imgUrl, activeViewerItem.title || '');
+  const success = await window.clipboardEngine.copyCombined(text, imagesToCopy, activeViewerItem.title || '');
   if (success && btn) {
     const label = btn.querySelector('.btn-label') || btn;
     const old = label.textContent;
     btn.classList.add('btn-copied');
-    label.textContent = isAr ? '✓ تم نسخ الاثنين' : '✓ Copied';
+    label.textContent = isAr ? (isMulti ? '✓ تم نسخ الكل' : '✓ تم نسخ الاثنين') : '✓ Copied';
     setTimeout(() => {
       btn.classList.remove('btn-copied');
       label.textContent = old;
@@ -721,6 +755,7 @@ window.closeItemViewer = closeItemViewer;
 window.navigateViewerGallery = navigateViewerGallery;
 window.switchViewerGalleryImage = switchViewerGalleryImage;
 window.copyActiveViewerImage = copyActiveViewerImage;
+window.copyAllViewerImages = copyAllViewerImages;
 window.downloadActiveViewerImage = downloadActiveViewerImage;
 window.toggleViewerImageZoom = toggleViewerImageZoom;
 window.openFullImageWindow = openFullImageWindow;

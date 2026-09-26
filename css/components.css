@@ -268,6 +268,30 @@
   color: #FFFFFF !important;
 }
 
+.btn-copy-all-images {
+  background: rgba(125, 29, 45, 0.08);
+  border-color: rgba(125, 29, 45, 0.3);
+  color: var(--burgundy-700);
+  font-weight: 700;
+}
+
+.btn-copy-all-images:hover {
+  background: var(--burgundy-700) !important;
+  border-color: var(--burgundy-700) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .btn-copy-all-images {
+  background: rgba(125, 29, 45, 0.25);
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #FECDD3;
+}
+
+[data-theme="dark"] .btn-copy-all-images:hover {
+  background: var(--burgundy-600) !important;
+  color: #FFFFFF !important;
+}
+
 .btn-card-delete {
   color: #DC2626;
   border-color: rgba(220, 38, 38, 0.25);
