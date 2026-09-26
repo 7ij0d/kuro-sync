@@ -5,6 +5,9 @@
 // Safe helper to extract FULL high-resolution image/file URL
 function getItemFileUrl(item) {
   if (!item) return '';
+  if (item.images && Array.isArray(item.images) && item.images.length > 0 && item.images[0].url) {
+    return item.images[0].url;
+  }
   let p = item.file_path;
   if (p && typeof p === 'object' && p.dataUrl) p = p.dataUrl;
   if (typeof p === 'string' && (p.startsWith('data:') || p.startsWith('http') || p.startsWith('./') || p.startsWith('blob:') || p.startsWith('assets') || p.startsWith('/'))) {
@@ -24,6 +27,9 @@ function getItemThumbnailUrl(item) {
   if (item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('data:')) {
     return item.thumbnail;
   }
+  if (item.images && Array.isArray(item.images) && item.images.length > 0 && item.images[0].thumbnail) {
+    return item.images[0].thumbnail;
+  }
   return getItemFileUrl(item);
 }
 window.getItemThumbnailUrl = getItemThumbnailUrl;
@@ -31,6 +37,7 @@ window.getItemThumbnailUrl = getItemThumbnailUrl;
 function renderItemCard(item, currentView = 'all') {
   if (!item) return '';
   const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
   const isTrash = item.deleted_at !== null;
 
   // Media / Icon thumbnail box
@@ -40,7 +47,23 @@ function renderItemCard(item, currentView = 'all') {
     if (!imgUrl) {
       imgUrl = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
     }
-    mediaHtml = `<img src="${imgUrl}" alt="${escapeHtml(item.title || 'Image')}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />`;
+
+    const isMulti = item.images && Array.isArray(item.images) && item.images.length > 1;
+    const multiCountBadge = isMulti ? `
+      <span class="badge-multi-count" title="${item.images.length} ${isAr ? 'صور' : 'images'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        <span>${item.images.length}</span>
+      </span>
+    ` : '';
+
+    mediaHtml = `
+      <img src="${imgUrl}" alt="${escapeHtml(item.title || 'Image')}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />
+      ${multiCountBadge}
+    `;
   } else if (item.type === 'file') {
     mediaHtml = `
       <div class="type-icon-pdf">
@@ -87,7 +110,11 @@ function renderItemCard(item, currentView = 'all') {
   if (item.file_size || item.type === 'file' || item.type === 'image') {
     const ext = item.file_name ? item.file_name.split('.').pop().toUpperCase() : item.type.toUpperCase();
     const sizeStr = item.file_size ? window.utils.formatBytes(item.file_size) : '';
-    snippet += `<div class="card-meta-line" style="${item.content ? 'margin-top:4px;' : ''}">${sizeStr ? `<span class="meta-pill">${sizeStr}</span> <span>•</span> ` : ''}<span>${ext}</span></div>`;
+    const isMulti = item.images && Array.isArray(item.images) && item.images.length > 1;
+    const multiPill = isMulti 
+      ? `<span class="meta-pill" style="background:rgba(125,29,45,0.1); color:var(--burgundy-700); font-weight:700;">${item.images.length} ${isAr ? 'صور' : 'images'}</span> <span>•</span> `
+      : '';
+    snippet += `<div class="card-meta-line" style="${item.content ? 'margin-top:4px;' : ''}">${multiPill}${sizeStr ? `<span class="meta-pill">${sizeStr}</span> <span>•</span> ` : ''}<span>${ext}</span></div>`;
   }
 
   // Favorite Star
@@ -221,7 +248,7 @@ function renderItemCard(item, currentView = 'all') {
   return `
     <div class="item-card" data-id="${item.id}" onclick="openItemViewer('${item.id}')">
       <div class="item-card-left">
-        <div class="card-media-box">
+        <div class="card-media-box" style="position:relative;">
           ${mediaHtml}
         </div>
         <div class="card-content-box">

@@ -16,16 +16,16 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700;750&display=swap" rel="stylesheet" />
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="./css/variables.css?v=3.5" />
-  <link rel="stylesheet" href="./css/base.css?v=3.5" />
-  <link rel="stylesheet" href="./css/layout.css?v=3.5" />
-  <link rel="stylesheet" href="./css/components.css?v=3.5" />
-  <link rel="stylesheet" href="./css/animations.css?v=3.5" />
+  <link rel="stylesheet" href="./css/variables.css?v=3.6" />
+  <link rel="stylesheet" href="./css/base.css?v=3.6" />
+  <link rel="stylesheet" href="./css/layout.css?v=3.6" />
+  <link rel="stylesheet" href="./css/components.css?v=3.6" />
+  <link rel="stylesheet" href="./css/animations.css?v=3.6" />
 
   <!-- Cache Invalidation & Modern Engine Bootstrap -->
   <script>
     (function() {
-      const APP_VER = 'kuro_v3_5';
+      const APP_VER = 'kuro_v3_6';
       if (localStorage.getItem('kuro_app_ver') !== APP_VER) {
         console.log('[KuroSync] Upgrading cache to ' + APP_VER);
         localStorage.removeItem('kuro_cached_supabase_items');
@@ -410,18 +410,23 @@
               <circle cx="8.5" cy="8.5" r="1.5"></circle>
               <polyline points="21 15 16 10 5 21"></polyline>
             </svg>
-            <div style="font-weight:600;">Drop image or screenshot here</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">PNG, JPG, WEBP, SVG</div>
-            <input type="file" id="new-image-input" accept="image/*" style="display:none;" onchange="handleFileSelected(this, 'image')" />
+            <div style="font-weight:600;">اسحب صورة أو عدة صور هنا، أو اضغط للاختيار</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">يمكنك اختيار أكثر من صورة معاً (PNG, JPG, WEBP)</div>
+            <input type="file" id="new-image-input" accept="image/*" multiple style="display:none;" onchange="handleFileSelected(this, 'image')" />
           </label>
           <div style="display:flex; justify-content:center; margin-top:10px;">
             <button type="button" class="btn-secondary" style="font-size:0.8125rem; gap:6px; padding:6px 14px;" onclick="pasteImageFromClipboard()">
               📋 لصق صورة من الحافظة (أو اضغط Ctrl+V)
             </button>
           </div>
-          <div id="image-selection-preview" style="display:none; margin-top:12px; text-align:center;">
-            <img id="image-preview-img" style="max-height:160px; max-width:100%; border-radius:var(--radius-md); border:1px solid var(--border-subtle); object-fit:contain;" />
-            <div id="image-selection-info" style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;"></div>
+          <div id="image-selection-preview" style="display:none; margin-top:12px;">
+            <div id="image-preview-grid" style="display:flex; gap:10px; overflow-x:auto; padding:8px 4px; -webkit-overflow-scrolling:touch;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; flex-wrap:wrap; gap:6px;">
+              <span id="image-selection-info" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;"></span>
+              <button type="button" class="btn-card-action" style="font-size:0.75rem; height:28px; padding:0 10px;" onclick="document.getElementById('new-image-input').click()">
+                + إضافة المزيد من الصور
+              </button>
+            </div>
           </div>
 
           <!-- Image Title & Description / Notes -->
@@ -661,31 +666,31 @@
   <div id="toast-container"></div>
 
   <!-- Scripts -->
-  <script src="./js/config.js?v=3.5"></script>
-  <script src="./js/supabaseClient.js?v=3.5"></script>
-  <script src="./js/i18n.js?v=3.5"></script>
-  <script src="./js/utils.js?v=3.5"></script>
-  <script src="./js/api.js?v=3.5"></script>
-  <script src="./js/realtime.js?v=3.5"></script>
-  <script src="./js/clipboard.js?v=3.5"></script>
-  <script src="./js/offline.js?v=3.5"></script>
-  <script src="./js/components/card.js?v=3.5"></script>
-  <script src="./js/components/newModal.js?v=3.5"></script>
-  <script src="./js/components/viewerModal.js?v=3.5"></script>
-  <script src="./js/components/deviceModal.js?v=3.5"></script>
-  <script src="./js/components/storageModal.js?v=3.5"></script>
-  <script src="./js/components/shareModal.js?v=3.5"></script>
-  <script src="./js/components/authModal.js?v=3.5"></script>
-  <script src="./js/components/cloudModal.js?v=3.5"></script>
-  <script src="./js/components/sidebar.js?v=3.5"></script>
-  <script src="./js/components/header.js?v=3.5"></script>
-  <script src="./js/app.js?v=3.5"></script>
+  <script src="./js/config.js?v=3.6"></script>
+  <script src="./js/supabaseClient.js?v=3.6"></script>
+  <script src="./js/i18n.js?v=3.6"></script>
+  <script src="./js/utils.js?v=3.6"></script>
+  <script src="./js/api.js?v=3.6"></script>
+  <script src="./js/realtime.js?v=3.6"></script>
+  <script src="./js/clipboard.js?v=3.6"></script>
+  <script src="./js/offline.js?v=3.6"></script>
+  <script src="./js/components/card.js?v=3.6"></script>
+  <script src="./js/components/newModal.js?v=3.6"></script>
+  <script src="./js/components/viewerModal.js?v=3.6"></script>
+  <script src="./js/components/deviceModal.js?v=3.6"></script>
+  <script src="./js/components/storageModal.js?v=3.6"></script>
+  <script src="./js/components/shareModal.js?v=3.6"></script>
+  <script src="./js/components/authModal.js?v=3.6"></script>
+  <script src="./js/components/cloudModal.js?v=3.6"></script>
+  <script src="./js/components/sidebar.js?v=3.6"></script>
+  <script src="./js/components/header.js?v=3.6"></script>
+  <script src="./js/app.js?v=3.6"></script>
 
   <!-- Register & Update Service Worker -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=3.5').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=3.6').then(reg => {
           if (reg && reg.update) reg.update();
         }).catch(err => console.log('SW registration error:', err));
       });

@@ -457,14 +457,14 @@ const api = {
       let thumbPath = '';
       if (isImg && window.compressImage) {
         try {
-          const comp = await window.compressImage(file, 2048, 0.90);
+          const comp = await window.compressImage(file, 1600, 0.85);
           processedPath = (comp && comp.dataUrl) ? comp.dataUrl : (typeof comp === 'string' ? comp : '');
           processedSize = (comp && comp.size) ? comp.size : file.size;
         } catch (e) {
           console.warn('Image compression fallback:', e);
         }
         try {
-          const thumbComp = await window.compressImage(file, 160, 0.7);
+          const thumbComp = await window.compressImage(file, 140, 0.65);
           thumbPath = (thumbComp && thumbComp.dataUrl) ? thumbComp.dataUrl : (typeof thumbComp === 'string' ? thumbComp : '');
         } catch (e) {}
       }
@@ -497,8 +497,8 @@ const api = {
         mime_type: file.type || (isImg ? 'image/jpeg' : 'application/octet-stream'),
         folder_id: folderId,
         is_favorite: isFavorite,
-        device_name: window.KuroSupabase ? window.KuroSupabase.detectDeviceName() : 'Web Device',
-        device_type: window.KuroSupabase ? window.KuroSupabase.detectDeviceType() : 'laptop',
+        device_name: window.KuroSupabase ? window.KuroSupabase.detectDeviceName() : 'iPad',
+        device_type: window.KuroSupabase ? window.KuroSupabase.detectDeviceType() : 'ipad',
         created_at: new Date().toISOString(),
         deleted_at: null
       };
@@ -546,6 +546,93 @@ const api = {
       throw err;
     }
     return data;
+  },
+
+  async uploadImages(files, folderId = null, extraData = {}) {
+    if (!files || files.length === 0) return { success: false };
+    if (files.length === 1) {
+      return this.uploadFile(files[0], folderId, false, extraData);
+    }
+
+    // Process all images in parallel
+    const processedImages = await Promise.all(Array.from(files).map(async (file, idx) => {
+      let fullPath = '';
+      let thumbPath = '';
+      let size = file.size;
+
+      if (window.compressImage) {
+        try {
+          const comp = await window.compressImage(file, 1600, 0.85);
+          fullPath = (comp && comp.dataUrl) ? comp.dataUrl : (typeof comp === 'string' ? comp : '');
+          size = (comp && comp.size) ? comp.size : file.size;
+        } catch(e) {}
+        try {
+          const thumbComp = await window.compressImage(file, 140, 0.65);
+          thumbPath = (thumbComp && thumbComp.dataUrl) ? thumbComp.dataUrl : (typeof thumbComp === 'string' ? thumbComp : '');
+        } catch(e) {}
+      }
+
+      if (!fullPath) {
+        fullPath = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+        });
+      }
+      if (!thumbPath) thumbPath = fullPath;
+
+      return {
+        id: 'img-' + Date.now() + '-' + idx,
+        url: fullPath,
+        thumbnail: thumbPath,
+        name: file.name,
+        size: size,
+        mime_type: file.type || 'image/jpeg'
+      };
+    }));
+
+    const title = (extraData && extraData.title) ? extraData.title : files[0].name.replace(/\.[^/.]+$/, '');
+    const content = (extraData && extraData.content) ? extraData.content : '';
+    const isFavorite = (extraData && extraData.is_favorite) ? 1 : 0;
+    const totalSize = processedImages.reduce((sum, img) => sum + img.size, 0);
+
+    const newItem = {
+      id: 'upload-' + Date.now(),
+      type: 'image',
+      title,
+      content,
+      file_name: Array.from(files).map(f => f.name).join(', '),
+      file_path: processedImages[0].url,
+      thumbnail: processedImages[0].thumbnail,
+      images: processedImages,
+      image_count: processedImages.length,
+      file_size: totalSize,
+      mime_type: files[0].type || 'image/jpeg',
+      folder_id: folderId,
+      is_favorite: isFavorite,
+      device_name: window.KuroSupabase ? window.KuroSupabase.detectDeviceName() : 'iPad',
+      device_type: window.KuroSupabase ? window.KuroSupabase.detectDeviceType() : 'ipad',
+      created_at: new Date().toISOString(),
+      deleted_at: null
+    };
+
+    if (window.KuroSupabase && window.KuroSupabase.isConfigured()) {
+      try {
+        const res = await window.KuroSupabase.createItem(newItem);
+        return res;
+      } catch (e) {
+        console.warn('Supabase multi-image upload fallback to local:', e);
+      }
+    }
+
+    try {
+      const items = LocalKuroStore.getItems();
+      items.unshift(newItem);
+      LocalKuroStore.saveItems(items);
+    } catch (err) {}
+
+    return { success: true, item: newItem };
   },
 
   async saveLink(data) {

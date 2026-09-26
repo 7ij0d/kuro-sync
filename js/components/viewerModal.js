@@ -1,15 +1,27 @@
 // ==========================================================
-// KURO SYNC DETAIL & PREVIEW MODAL
+// KURO SYNC DETAIL & PREVIEW MODAL (WITH MULTI-IMAGE CAROUSEL & EDITING)
 // ==========================================================
 
 let activeViewerItem = null;
 let autoSaveTimer = null;
+let viewerActiveImageIndex = 0;
+
+function getActiveViewerImageUrl() {
+  if (!activeViewerItem) return '';
+  if (activeViewerItem.images && Array.isArray(activeViewerItem.images) && activeViewerItem.images.length > 0) {
+    const img = activeViewerItem.images[viewerActiveImageIndex] || activeViewerItem.images[0];
+    return img.url || img.thumbnail;
+  }
+  return window.getItemFileUrl ? window.getItemFileUrl(activeViewerItem) : (activeViewerItem.file_path || activeViewerItem.thumbnail || '');
+}
 
 function openItemViewer(itemId) {
-  const item = (window.currentItems || []).find(i => i.id === itemId);
+  const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
 
   activeViewerItem = item;
+  viewerActiveImageIndex = 0;
+
   const modal = document.getElementById('viewer-modal');
   const titleInput = document.getElementById('viewer-title-input');
   const bodyEl = document.getElementById('viewer-body-content');
@@ -27,7 +39,7 @@ function openItemViewer(itemId) {
   activeViewerItem._newImageFileSize = null;
 
   metaDeviceEl.textContent = `${item.device_name || 'iPad'}`;
-  metaTimeEl.textContent = window.utils.formatTime(item.created_at);
+  metaTimeEl.textContent = window.utils ? window.utils.formatTime(item.created_at) : '';
   metaSizeEl.textContent = item.file_size ? window.utils.formatBytes(item.file_size) : (item.type.toUpperCase());
 
   if (favoriteBtn) {
@@ -70,75 +82,103 @@ function openItemViewer(itemId) {
       });
     }
   } else if (item.type === 'image') {
-    let fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
+    const isMulti = item.images && Array.isArray(item.images) && item.images.length > 1;
+    let fileUrl = getActiveViewerImageUrl();
 
-    // If only thumbnail is present in memory, immediately fetch full high-res from Supabase
+    // If only thumbnail is present in memory, fetch full high-res from Supabase
     if ((!fileUrl || (item.thumbnail && fileUrl === item.thumbnail)) && window.KuroSupabase && window.KuroSupabase.isConfigured()) {
       window.KuroSupabase.request(`/settings?key=eq.ks_item_${item.id}&select=*`).then(rows => {
         if (rows && rows[0]) {
           const val = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
-          if (val && val.file_path) {
-            item.file_path = (val.file_path && typeof val.file_path === 'object' && val.file_path.dataUrl) ? val.file_path.dataUrl : val.file_path;
+          if (val && (val.file_path || val.images)) {
+            if (val.images && Array.isArray(val.images)) {
+              item.images = val.images;
+            }
+            if (val.file_path) {
+              item.file_path = (val.file_path && typeof val.file_path === 'object' && val.file_path.dataUrl) ? val.file_path.dataUrl : val.file_path;
+            }
             const imgEl = document.getElementById('viewer-main-img');
-            if (imgEl && typeof item.file_path === 'string') {
-              imgEl.src = item.file_path;
+            const targetUrl = getActiveViewerImageUrl();
+            if (imgEl && targetUrl) {
+              imgEl.src = targetUrl;
             }
           }
         }
       }).catch(() => {});
     }
 
-    bodyEl.innerHTML = `
-        <div class="viewer-img-wrapper" style="min-height:360px; max-height:70vh; width:100%; overflow:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; padding:12px; position:relative;">
-          <img id="viewer-main-img" src="${fileUrl}" alt="${item.title}" style="width:100%; max-width:100%; max-height:66vh; height:auto; object-fit:contain; border-radius:var(--radius-md); box-shadow:0 4px 20px rgba(0,0,0,0.08); cursor:zoom-in; transition:all 0.25s var(--spring);" onclick="toggleViewerImageZoom(this)" title="اضغط للتكبير والتصغير 🔍" />
-        </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%;">
-          <button class="btn-secondary" onclick="openFullImageWindow('${item.id}')" title="فتح الصورة الأصلية بدقتها الكاملة في نافذة جديدة">
-            🔍 الحجم الكامل
-          </button>
-          <button class="btn-card-action" onclick="copyCardImage('${item.id}', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <circle cx="8.5" cy="8.5" r="1.5"></circle>
-              <polyline points="21 15 16 10 5 21"></polyline>
-            </svg>
-            <span class="btn-label">${window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة'}</span>
-          </button>
-          <button class="btn-card-action" onclick="copyViewerNotes('${item.id}', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-            <span class="btn-label">${window.i18n ? (window.i18n.t('copyText') || 'نسخ النص') : 'نسخ النص'}</span>
-          </button>
-          <button class="btn-card-action btn-card-both" onclick="copyViewerCombined('${item.id}', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-            </svg>
-            <span class="btn-label">${window.i18n ? (window.i18n.t('copyBoth') || 'نسخ الاثنين معاً') : 'نسخ الاثنين معاً'}</span>
-          </button>
-          <button class="btn-card-action" onclick="document.getElementById('viewer-replace-image-input').click()" title="استبدال أو تغيير هذه الصورة">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-              <circle cx="12" cy="13" r="4"></circle>
-            </svg>
-            <span class="btn-label">📷 تغيير الصورة</span>
-          </button>
-          <input type="file" id="viewer-replace-image-input" accept="image/*" style="display:none;" onchange="handleViewerImageReplace(this)" />
-          <button class="btn-primary" onclick="downloadItemFile('${item.id}')">
-            ⬇️ ${window.i18n ? window.i18n.t('download') : 'تحميل'}
-          </button>
-        </div>
+    const navArrowsHtml = isMulti ? `
+      <button type="button" class="viewer-nav-btn prev" onclick="navigateViewerGallery(-1)" title="الصورة السابقة (سهم يسار)">❮</button>
+      <button type="button" class="viewer-nav-btn next" onclick="navigateViewerGallery(1)" title="الصورة التالية (سهم يمين)">❯</button>
+      <div id="viewer-gallery-counter" style="position:absolute; top:12px; inset-inline-end:12px; background:rgba(18,18,20,0.78); color:#fff; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:var(--radius-full); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:10; pointer-events:none; border:1px solid rgba(255,255,255,0.2);">
+        📷 1 / ${item.images.length}
+      </div>
+    ` : '';
 
-        <!-- Notes / Description Section for Image -->
-        <div style="width:100%; margin-top:6px; display:flex; flex-direction:column; gap:6px;">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
-            <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">ملاحظات وشرح الصورة / Notes:</label>
-            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-img-notes-status"></span>
+    const thumbsStripHtml = isMulti ? `
+      <div id="viewer-gallery-strip" style="display:flex; gap:8px; overflow-x:auto; padding:6px 2px; width:100%; -webkit-overflow-scrolling:touch; margin-top:4px;">
+        ${item.images.map((img, idx) => `
+          <div class="gallery-thumb-item ${idx === 0 ? 'active' : ''}" onclick="switchViewerGalleryImage(${idx})" title="صورة ${idx + 1}">
+            <img src="${img.thumbnail || img.url}" alt="${escapeHtml(img.name || '')}" style="width:100%; height:100%; object-fit:cover;" />
           </div>
-          <textarea id="viewer-img-notes" style="width:100%; min-height:90px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface);" placeholder="أضف أو عدّل ملاحظاتك وشرحك لهذه الصورة هنا...">${escapeHtml(item.content || '')}</textarea>
+        `).join('')}
+      </div>
+    ` : '';
+
+    bodyEl.innerHTML = `
+      <div class="viewer-img-wrapper" style="min-height:360px; max-height:70vh; width:100%; overflow:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-lg); border:1px solid var(--border-subtle); background:var(--bg-surface-subtle); display:flex; align-items:center; justify-content:center; padding:12px; position:relative;">
+        ${navArrowsHtml}
+        <img id="viewer-main-img" src="${fileUrl}" alt="${item.title}" style="width:100%; max-width:100%; max-height:66vh; height:auto; object-fit:contain; border-radius:var(--radius-md); box-shadow:0 4px 20px rgba(0,0,0,0.08); cursor:zoom-in; transition:all 0.25s var(--spring);" onclick="toggleViewerImageZoom(this)" title="اضغط للتكبير والتصغير 🔍" />
+      </div>
+
+      ${thumbsStripHtml}
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%; margin-top:8px;">
+        <button class="btn-secondary" onclick="openFullImageWindow('${item.id}')" title="فتح الصورة الحالية بدقتها الكاملة في نافذة جديدة">
+          🔍 الحجم الكامل
+        </button>
+        <button class="btn-card-action" onclick="copyActiveViewerImage(this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span class="btn-label">${window.i18n ? window.i18n.t('copyImage') : 'نسخ الصورة'}</span>
+        </button>
+        <button class="btn-card-action" onclick="copyViewerNotes('${item.id}', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          <span class="btn-label">${window.i18n ? (window.i18n.t('copyText') || 'نسخ النص') : 'نسخ النص'}</span>
+        </button>
+        <button class="btn-card-action btn-card-both" onclick="copyViewerCombined('${item.id}', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          </svg>
+          <span class="btn-label">${window.i18n ? (window.i18n.t('copyBoth') || 'نسخ الاثنين معاً') : 'نسخ الاثنين معاً'}</span>
+        </button>
+        <button class="btn-card-action" onclick="document.getElementById('viewer-replace-image-input').click()" title="استبدال أو تغيير هذه الصورة">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <span class="btn-label">📷 تغيير الصورة</span>
+        </button>
+        <input type="file" id="viewer-replace-image-input" accept="image/*" style="display:none;" onchange="handleViewerImageReplace(this)" />
+        <button class="btn-primary" onclick="downloadActiveViewerImage('${item.id}')">
+          ⬇️ ${window.i18n ? window.i18n.t('download') : 'تحميل'}
+        </button>
+      </div>
+
+      <!-- Notes / Description Section for Image -->
+      <div style="width:100%; margin-top:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <label style="font-size:0.8125rem; font-weight:700; color:var(--text-secondary);">ملاحظات وشرح الصورة / Notes:</label>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-img-notes-status"></span>
         </div>
+        <textarea id="viewer-img-notes" style="width:100%; min-height:90px; padding:10px 12px; font-size:0.875rem; line-height:1.6; resize:vertical; border-radius:var(--radius-md); border:1px solid var(--border-subtle); background:var(--bg-surface);" placeholder="أضف أو عدّل ملاحظاتك وشرحك لهذه الصورة هنا...">${escapeHtml(item.content || '')}</textarea>
       </div>
     `;
 
@@ -197,7 +237,7 @@ function openItemViewer(itemId) {
           </div>
           <div>
             <h4 style="font-size:1.125rem; font-weight:700;">${escapeHtml(item.file_name || item.title)}</h4>
-            <p style="font-size:0.875rem; color:var(--text-muted);">${window.utils.formatBytes(item.file_size)} • ${item.mime_type || 'Document'}</p>
+            <p style="font-size:0.875rem; color:var(--text-muted);">${window.utils ? window.utils.formatBytes(item.file_size) : ''} • ${item.mime_type || 'Document'}</p>
           </div>
           <button class="btn-primary" onclick="downloadItemFile('${item.id}')">
             ${window.i18n ? window.i18n.t('download') : 'تحميل'}
@@ -258,13 +298,112 @@ function closeItemViewer() {
   const modal = document.getElementById('viewer-modal');
   if (modal) modal.classList.remove('active');
   activeViewerItem = null;
+  viewerActiveImageIndex = 0;
 }
+
+// Navigate Multi-Image Gallery
+function navigateViewerGallery(delta) {
+  if (!activeViewerItem || !activeViewerItem.images || activeViewerItem.images.length <= 1) return;
+  const len = activeViewerItem.images.length;
+  viewerActiveImageIndex = (viewerActiveImageIndex + delta + len) % len;
+  updateViewerGalleryDisplay();
+}
+
+function switchViewerGalleryImage(index) {
+  if (!activeViewerItem || !activeViewerItem.images || index < 0 || index >= activeViewerItem.images.length) return;
+  viewerActiveImageIndex = index;
+  updateViewerGalleryDisplay();
+}
+
+function updateViewerGalleryDisplay() {
+  if (!activeViewerItem || !activeViewerItem.images) return;
+  const currentImg = activeViewerItem.images[viewerActiveImageIndex];
+  if (!currentImg) return;
+
+  const mainImg = document.getElementById('viewer-main-img');
+  if (mainImg) {
+    mainImg.src = currentImg.url || currentImg.thumbnail;
+  }
+
+  const counter = document.getElementById('viewer-gallery-counter');
+  if (counter) {
+    counter.textContent = `📷 ${viewerActiveImageIndex + 1} / ${activeViewerItem.images.length}`;
+  }
+
+  document.querySelectorAll('#viewer-gallery-strip .gallery-thumb-item').forEach((thumb, idx) => {
+    thumb.classList.toggle('active', idx === viewerActiveImageIndex);
+    if (idx === viewerActiveImageIndex) {
+      thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  });
+
+  const metaSizeEl = document.getElementById('viewer-meta-size');
+  if (metaSizeEl && currentImg.size && window.utils) {
+    metaSizeEl.textContent = window.utils.formatBytes(currentImg.size);
+  }
+}
+
+// Arrow Key Navigation for Gallery
+window.addEventListener('keydown', (e) => {
+  const modal = document.getElementById('viewer-modal');
+  if (!modal || !modal.classList.contains('active')) return;
+  if (!activeViewerItem || !activeViewerItem.images || activeViewerItem.images.length <= 1) return;
+
+  // Don't intercept if user is typing in title or notes editor
+  const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+  if (tag === 'input' || tag === 'textarea') return;
+
+  if (e.key === 'ArrowRight') {
+    navigateViewerGallery(1);
+  } else if (e.key === 'ArrowLeft') {
+    navigateViewerGallery(-1);
+  } else if (e.key === 'Escape') {
+    closeItemViewer();
+  }
+});
 
 async function copyViewerText() {
   const editor = document.getElementById('viewer-text-editor');
   if (editor) {
     await window.clipboardEngine.copyText(editor.value);
   }
+}
+
+async function copyActiveViewerImage(btn) {
+  if (!activeViewerItem) return;
+  const imgUrl = getActiveViewerImageUrl();
+  if (!imgUrl) return;
+
+  const success = await window.clipboardEngine.copyImage(imgUrl);
+  if (success && btn) {
+    const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+    const label = btn.querySelector('.btn-label') || btn;
+    const old = label.textContent;
+    btn.classList.add('btn-copied');
+    label.textContent = isAr ? '✓ تم نسخ الصورة' : '✓ Copied';
+    setTimeout(() => {
+      btn.classList.remove('btn-copied');
+      label.textContent = old;
+    }, 2000);
+  }
+}
+
+async function downloadActiveViewerImage(itemId) {
+  if (!activeViewerItem) return;
+  const url = getActiveViewerImageUrl();
+  if (url) {
+    const a = document.createElement('a');
+    a.href = url;
+    const currentName = (activeViewerItem.images && activeViewerItem.images[viewerActiveImageIndex]) 
+      ? activeViewerItem.images[viewerActiveImageIndex].name 
+      : (activeViewerItem.file_name || activeViewerItem.title || 'image.png');
+    a.download = currentName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+  if (window.downloadItemFile) window.downloadItemFile(itemId);
 }
 
 async function toggleViewerFavorite() {
@@ -326,7 +465,7 @@ async function copyViewerCombined(itemId, btn) {
   if (!activeViewerItem) return;
   const editor = document.getElementById('viewer-img-notes');
   const text = editor ? editor.value : (activeViewerItem.content || '');
-  const imgUrl = window.getItemFileUrl ? window.getItemFileUrl(activeViewerItem) : (typeof activeViewerItem.file_path === 'string' ? activeViewerItem.file_path : `/api/items/${activeViewerItem.id}/file`);
+  const imgUrl = getActiveViewerImageUrl();
 
   const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
   const success = await window.clipboardEngine.copyCombined(text, imgUrl, activeViewerItem.title || '');
@@ -365,6 +504,11 @@ async function saveViewerItemChanges(btn) {
 
   // If image was replaced
   if (activeViewerItem._newImageFilePath) {
+    if (activeViewerItem.images && Array.isArray(activeViewerItem.images) && activeViewerItem.images[viewerActiveImageIndex]) {
+      activeViewerItem.images[viewerActiveImageIndex].url = activeViewerItem._newImageFilePath;
+      activeViewerItem.images[viewerActiveImageIndex].thumbnail = activeViewerItem._newThumbnail || activeViewerItem._newImageFilePath;
+      updates.images = activeViewerItem.images;
+    }
     updates.file_path = activeViewerItem._newImageFilePath;
     if (activeViewerItem._newImageFileSize) {
       updates.file_size = activeViewerItem._newImageFileSize;
@@ -442,13 +586,13 @@ async function handleViewerImageReplace(input) {
     let compressedDataUrl = '';
     let thumbDataUrl = '';
 
-    if (window.utils && window.utils.compressImage) {
+    if (window.compressImage) {
       try {
-        const comp = await window.utils.compressImage(file, 1200, 0.8);
+        const comp = await window.compressImage(file, 1600, 0.85);
         compressedDataUrl = (comp && comp.dataUrl) ? comp.dataUrl : (typeof comp === 'string' ? comp : '');
       } catch (e) {}
       try {
-        const thumbComp = await window.utils.compressImage(file, 120, 0.6);
+        const thumbComp = await window.compressImage(file, 140, 0.65);
         thumbDataUrl = (thumbComp && thumbComp.dataUrl) ? thumbComp.dataUrl : (typeof thumbComp === 'string' ? thumbComp : '');
       } catch (e) {}
     }
@@ -467,7 +611,7 @@ async function handleViewerImageReplace(input) {
     activeViewerItem._newImageFileSize = Math.round(compressedDataUrl.length * 0.75);
 
     // Update modal preview image immediately
-    const imgEl = document.querySelector('#viewer-body-content img');
+    const imgEl = document.getElementById('viewer-main-img');
     if (imgEl) {
       imgEl.src = compressedDataUrl;
     }
@@ -520,7 +664,7 @@ function toggleViewerImageZoom(img) {
 function openFullImageWindow(itemId) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId)) || activeViewerItem;
   if (!item) return;
-  const url = window.getItemFileUrl ? window.getItemFileUrl(item) : (item.file_path || item.thumbnail);
+  const url = getActiveViewerImageUrl() || (window.getItemFileUrl ? window.getItemFileUrl(item) : (item.file_path || item.thumbnail));
   if (!url) return;
 
   const win = window.open('');
@@ -574,6 +718,10 @@ function openFullImageWindow(itemId) {
 
 window.openItemViewer = openItemViewer;
 window.closeItemViewer = closeItemViewer;
+window.navigateViewerGallery = navigateViewerGallery;
+window.switchViewerGalleryImage = switchViewerGalleryImage;
+window.copyActiveViewerImage = copyActiveViewerImage;
+window.downloadActiveViewerImage = downloadActiveViewerImage;
 window.toggleViewerImageZoom = toggleViewerImageZoom;
 window.openFullImageWindow = openFullImageWindow;
 window.copyViewerText = copyViewerText;

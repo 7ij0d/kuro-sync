@@ -121,7 +121,7 @@ const utils = {
   },
 
   // Compress and resize images client-side for lightning-fast cloud sync
-  compressImage(file, maxWidth = 2048, quality = 0.90) {
+  compressImage(file, maxWidth = 1600, quality = 0.85) {
     return new Promise((resolve) => {
       if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
         const reader = new FileReader();
