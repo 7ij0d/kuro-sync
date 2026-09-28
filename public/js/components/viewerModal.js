@@ -51,7 +51,7 @@ function openItemViewer(itemId) {
     bodyEl.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
-          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-autosave-status">Auto-saved</span>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="viewer-autosave-status">${item.content_truncated ? 'Loading full note...' : 'Auto-saved'}</span>
           <button class="btn-card-action" onclick="copyViewerText()">
             ${window.i18n ? window.i18n.t('copy') : 'Copy Text'}
           </button>
@@ -59,6 +59,18 @@ function openItemViewer(itemId) {
         <textarea id="viewer-text-editor" style="width:100%; min-height:260px; padding:14px; font-size:0.9375rem; line-height:1.6; resize:vertical;" placeholder="Write your notes here...">${escapeHtml(item.content || '')}</textarea>
       </div>
     `;
+
+    // On-demand load full text from Storage if truncated in metadata
+    if ((item.content_truncated || item.content_storage_url) && window.KuroSupabase && window.KuroSupabase.ensureFullItemContent) {
+      window.KuroSupabase.ensureFullItemContent(item).then(fullText => {
+        if (activeViewerItem && String(activeViewerItem.id) === String(item.id)) {
+          const ed = document.getElementById('viewer-text-editor');
+          if (ed) ed.value = fullText;
+          const st = document.getElementById('viewer-autosave-status');
+          if (st) st.textContent = 'Auto-saved';
+        }
+      });
+    }
 
     // Setup live auto-save
     const editor = document.getElementById('viewer-text-editor');
@@ -74,7 +86,7 @@ function openItemViewer(itemId) {
             await window.api.updateItem(item.id, { content: newContent });
             item.content = newContent;
             if (statusEl) statusEl.textContent = 'Saved ✓';
-            window.refreshItems();
+            if (window.refreshItems) window.refreshItems(false);
           } catch (e) {
             if (statusEl) statusEl.textContent = 'Error saving';
           }
@@ -83,31 +95,26 @@ function openItemViewer(itemId) {
     }
   } else if (item.type === 'image') {
     const isMulti = item.images && Array.isArray(item.images) && item.images.length > 1;
-    let fileUrl = getActiveViewerImageUrl();
+    let fileUrl = item._resolvedFullBlobUrl || (item.thumbnail && item.thumbnail.startsWith('blob:') ? item.thumbnail : '') || './assets/samples/histology_bell_stage.svg';
 
-    // If only thumbnail is present or some high-res images are missing in memory, fetch full rows from Supabase
-    const hasMissingFullImages = item.images && Array.isArray(item.images) && item.images.some(img => !img.url || (img.thumbnail && img.url === img.thumbnail));
-    if ((!fileUrl || hasMissingFullImages || (item.thumbnail && fileUrl === item.thumbnail)) && window.KuroSupabase && window.KuroSupabase.isConfigured()) {
-      window.KuroSupabase.request(`/settings?key=eq.ks_item_${item.id}&select=*`).then(rows => {
-        if (rows && rows[0]) {
-          const val = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
-          if (val && (val.file_path || val.images)) {
-            if (val.images && Array.isArray(val.images)) {
-              item.images = val.images;
-              activeViewerItem.images = val.images;
-            }
-            if (val.file_path) {
-              item.file_path = (val.file_path && typeof val.file_path === 'object' && val.file_path.dataUrl) ? val.file_path.dataUrl : val.file_path;
-              activeViewerItem.file_path = item.file_path;
-            }
+    // Load full-resolution image(s) and full notes on demand from Supabase Storage ONLY when viewer opens
+    if (window.KuroSupabase) {
+      if (window.KuroSupabase.ensureFullItemMedia) {
+        window.KuroSupabase.ensureFullItemMedia(item).then(resolvedBlobUrl => {
+          if (activeViewerItem && String(activeViewerItem.id) === String(item.id) && resolvedBlobUrl) {
             const imgEl = document.getElementById('viewer-main-img');
-            const targetUrl = getActiveViewerImageUrl();
-            if (imgEl && targetUrl) {
-              imgEl.src = targetUrl;
-            }
+            if (imgEl) imgEl.src = getActiveViewerImageUrl() || resolvedBlobUrl;
           }
-        }
-      }).catch(() => {});
+        }).catch(() => {});
+      }
+      if ((item.content_truncated || item.content_storage_url) && window.KuroSupabase.ensureFullItemContent) {
+        window.KuroSupabase.ensureFullItemContent(item).then(fullText => {
+          if (activeViewerItem && String(activeViewerItem.id) === String(item.id)) {
+            const notesEl = document.getElementById('viewer-img-notes');
+            if (notesEl) notesEl.value = fullText;
+          }
+        }).catch(() => {});
+      }
     }
 
     const navArrowsHtml = isMulti ? `

@@ -5,16 +5,22 @@
 // Safe helper to extract FULL high-resolution image/file URL
 function getItemFileUrl(item) {
   if (!item) return '';
-  if (item.images && Array.isArray(item.images) && item.images.length > 0 && item.images[0].url) {
-    return item.images[0].url;
+  if (item._resolvedFullBlobUrl) return item._resolvedFullBlobUrl;
+  if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+    const first = item.images[0];
+    if (first.url && (first.url.startsWith('blob:') || first.url.startsWith('data:'))) return first.url;
+    if (first.storage_url) return first.storage_url;
+  }
+  if (item.storage_url) return item.storage_url;
+  if (item.storage_path && window.KuroSupabase) {
+    return window.KuroSupabase.getPublicStorageUrl(item.storage_path);
   }
   let p = item.file_path;
   if (p && typeof p === 'object' && p.dataUrl) p = p.dataUrl;
   if (typeof p === 'string' && (p.startsWith('data:') || p.startsWith('http') || p.startsWith('./') || p.startsWith('blob:') || p.startsWith('assets') || p.startsWith('/'))) {
     return p;
   }
-  // Fallback to thumbnail only if full image is not available
-  if (item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('data:')) {
+  if (item.thumbnail && typeof item.thumbnail === 'string' && (item.thumbnail.startsWith('data:') || item.thumbnail.startsWith('blob:'))) {
     return item.thumbnail;
   }
   return item.id ? `/api/items/${item.id}/file` : '';
@@ -24,11 +30,17 @@ window.getItemFileUrl = getItemFileUrl;
 // Helper to extract low-res thumbnail ONLY for small feed card icons
 function getItemThumbnailUrl(item) {
   if (!item) return '';
-  if (item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('data:')) {
+  if (item.thumbnail && typeof item.thumbnail === 'string' && (item.thumbnail.startsWith('blob:') || item.thumbnail.startsWith('data:'))) {
     return item.thumbnail;
   }
-  if (item.images && Array.isArray(item.images) && item.images.length > 0 && item.images[0].thumbnail) {
-    return item.images[0].thumbnail;
+  if (item.thumb_storage_url) return item.thumb_storage_url;
+  if (item.thumb_storage_path && window.KuroSupabase) {
+    return window.KuroSupabase.getPublicStorageUrl(item.thumb_storage_path);
+  }
+  if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+    const first = item.images[0];
+    if (first.thumbnail && (first.thumbnail.startsWith('blob:') || first.thumbnail.startsWith('data:'))) return first.thumbnail;
+    if (first.thumb_storage_url) return first.thumb_storage_url;
   }
   return getItemFileUrl(item);
 }
@@ -43,10 +55,13 @@ function renderItemCard(item, currentView = 'all') {
   // Media / Icon thumbnail box
   let mediaHtml = '';
   if (item.type === 'image') {
-    let imgUrl = getItemThumbnailUrl(item);
-    if (!imgUrl) {
-      imgUrl = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
-    }
+    const rawThumbUrl = getItemThumbnailUrl(item);
+    const placeholderSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50" viewBox="0 0 60 50"><rect fill="%23fbecee" width="60" height="50"/><path d="M15 35 L28 20 L40 30 L48 24 L55 35 Z" fill="%237d1d2d" opacity="0.4"/></svg>';
+    const isNeedsStorageResolve = rawThumbUrl && rawThumbUrl.includes('/storage/v1/object/');
+    const initialSrc = (!rawThumbUrl || isNeedsStorageResolve) ? placeholderSvg : rawThumbUrl;
+    const storageAttrs = isNeedsStorageResolve
+      ? `data-storage-src="${escapeHtml(rawThumbUrl)}" data-storage-mime="${escapeHtml(item.mime_type || 'image/jpeg')}"`
+      : '';
 
     const isMulti = item.images && Array.isArray(item.images) && item.images.length > 1;
     const multiCountBadge = isMulti ? `
@@ -61,7 +76,7 @@ function renderItemCard(item, currentView = 'all') {
     ` : '';
 
     mediaHtml = `
-      <img src="${imgUrl}" alt="${escapeHtml(item.title || 'Image')}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />
+      <img src="${initialSrc}" ${storageAttrs} alt="${escapeHtml(item.title || 'Image')}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='./assets/samples/histology_bell_stage.svg';" />
       ${multiCountBadge}
     `;
   } else if (item.type === 'file') {

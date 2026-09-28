@@ -109,8 +109,17 @@ async function bootstrapSession() {
   }
 }
 
-// Refresh items list from backend
-async function refreshItems() {
+window.currentPageLimit = 20;
+window.PAGE_STEP = 20;
+
+function loadMoreFeedItems() {
+  window.currentPageLimit = (window.currentPageLimit || 20) + (window.PAGE_STEP || 20);
+  renderItemsFeed(window.currentItems || []);
+}
+window.loadMoreFeedItems = loadMoreFeedItems;
+
+// Refresh items list (uses in-memory metadata cache unless forceNetwork=true)
+async function refreshItems(forceNetwork = false) {
   const itemsContainer = document.getElementById('items-feed-container');
   if (!itemsContainer) return;
 
@@ -119,7 +128,8 @@ async function refreshItems() {
 
   const params = {
     sort: window.currentSortOrder,
-    trash: isTrashView ? '1' : '0'
+    trash: isTrashView ? '1' : '0',
+    forceRefresh: Boolean(forceNetwork)
   };
 
   if (window.currentFilterType && window.currentFilterType !== 'all') {
@@ -163,13 +173,6 @@ async function refreshItems() {
     window.currentItems = data.items;
     window.currentStorage = data.storage;
 
-    // Cache to local storage for instant zero-delay loading on startup
-    if (!isTrashView && !isFavoritesView && (!params.type || params.type === 'all') && !params.search) {
-      if (window.KuroSupabase && window.KuroSupabase.setCachedItems) {
-        window.KuroSupabase.setCachedItems(data.items);
-      }
-    }
-
     // Update badges & storage meter
     if (window.updateSidebarBadges) window.updateSidebarBadges(data.counts);
     if (window.updateStorageMeter) window.updateStorageMeter(data.storage);
@@ -193,12 +196,13 @@ async function refreshFolders() {
   } catch (err) {}
 }
 
-// Render feed of cards
+// Render feed of cards with pagination and lazy thumbnail observation
 function renderItemsFeed(items = []) {
   const container = document.getElementById('items-feed-container');
   if (!container) return;
 
   const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
 
   // Empty state handling
   if (!items || items.length === 0) {
@@ -224,6 +228,10 @@ function renderItemsFeed(items = []) {
     return;
   }
 
+  const limit = window.currentPageLimit || 20;
+  const visibleItems = items.slice(0, limit);
+  const remainingCount = Math.max(0, items.length - visibleItems.length);
+
   // Safe card renderer with error boundary
   const renderSafeCard = (item) => {
     try {
@@ -235,8 +243,8 @@ function renderItemsFeed(items = []) {
     }
   };
 
-  // Group items by date (Today, Yesterday, Earlier)
-  const grouped = window.utils.groupItemsByDate(items);
+  // Group visible items by date (Today, Yesterday, Earlier)
+  const grouped = window.utils.groupItemsByDate(visibleItems);
   let html = '';
 
   if (grouped.today.length > 0) {
@@ -274,10 +282,25 @@ function renderItemsFeed(items = []) {
 
   // Fallback if date grouping produced empty output
   if (!html.trim()) {
-    html = `<div class="items-list">${items.map(renderSafeCard).join('')}</div>`;
+    html = `<div class="items-list">${visibleItems.map(renderSafeCard).join('')}</div>`;
+  }
+
+  if (remainingCount > 0) {
+    html += `
+      <div id="feed-load-more-sentinel" style="display:flex; justify-content:center; padding:20px 0 8px;">
+        <button type="button" class="btn-secondary" onclick="loadMoreFeedItems()" style="padding:8px 20px; font-weight:600; font-size:0.85rem;">
+          ${isAr ? `عرض المزيد (${remainingCount} متبقية)` : `Load More (${remainingCount} remaining)`}
+        </button>
+      </div>
+    `;
   }
 
   container.innerHTML = html;
+
+  // Activate lazy loading of visible thumbnails from Supabase Storage
+  if (window.KuroSupabase && window.KuroSupabase.observeLazyStorageImages) {
+    window.KuroSupabase.observeLazyStorageImages(container);
+  }
 }
 
 // Handle Realtime incoming events from WebSocket
@@ -286,11 +309,10 @@ function handleRealtimeEvent(event) {
 
   switch (event.type) {
     case 'ITEM_CREATED':
-      // Instant insertion or refresh
       if (window.utils) {
         window.utils.showToast(`New ${event.item.type} received from ${event.item.device_name || 'connected device'}!`);
       }
-      refreshItems();
+      refreshItems(true);
       break;
 
     case 'ITEM_UPDATED':
@@ -299,7 +321,7 @@ function handleRealtimeEvent(event) {
     case 'ITEM_PURGED':
     case 'TRASH_EMPTIED':
     case 'ITEMS_REFRESH':
-      refreshItems();
+      refreshItems(true);
       break;
 
     case 'DEVICE_JOINED':
@@ -319,6 +341,7 @@ function handleRealtimeEvent(event) {
 function switchNavView(viewName) {
   window.currentView = viewName;
   window.currentFolderId = null;
+  window.currentPageLimit = 20;
 
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.view === viewName);
@@ -344,13 +367,15 @@ function switchNavView(viewName) {
     window.currentFilterType = 'all';
   }
 
-  refreshItems();
+  // Filters in-memory without re-downloading from Supabase
+  refreshItems(false);
   if (window.closeMobileSidebar) window.closeMobileSidebar();
 }
 
 function selectFolder(folderId) {
   window.currentView = 'folder';
   window.currentFolderId = folderId;
+  window.currentPageLimit = 20;
 
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
 
@@ -360,14 +385,19 @@ function selectFolder(folderId) {
     titleEl.textContent = folder.name;
   }
 
-  refreshItems();
+  refreshItems(false);
   if (window.closeMobileSidebar) window.closeMobileSidebar();
 }
 
-// Quick Card Actions
+// Quick Card Actions (Fetch full content/file from Storage on demand only when clicked!)
 async function copyCardText(itemId, btn) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
-  if (!item || !item.content) return;
+  if (!item) return;
+
+  if ((item.content_truncated || item.content_storage_url) && window.KuroSupabase && window.KuroSupabase.ensureFullItemContent) {
+    await window.KuroSupabase.ensureFullItemContent(item);
+  }
+  if (!item.content) return;
 
   const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
   const success = await window.clipboardEngine.copyText(item.content, isAr ? 'تم نسخ النص بنجاح! 📝' : 'Text copied to clipboard!');
@@ -387,7 +417,14 @@ async function copyCardText(itemId, btn) {
 async function copyCardImage(itemId, btn) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
-  const imgUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`);
+
+  let imgUrl = '';
+  if (window.KuroSupabase && window.KuroSupabase.ensureFullItemMedia) {
+    imgUrl = await window.KuroSupabase.ensureFullItemMedia(item);
+  }
+  if (!imgUrl) {
+    imgUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`);
+  }
 
   const success = await window.clipboardEngine.copyImage(imgUrl);
   if (success && btn) {
@@ -407,6 +444,14 @@ async function copyCardImage(itemId, btn) {
 async function copyCardCombined(itemId, btn) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
+
+  if (window.KuroSupabase) {
+    await Promise.all([
+      window.KuroSupabase.ensureFullItemContent ? window.KuroSupabase.ensureFullItemContent(item) : Promise.resolve(),
+      window.KuroSupabase.ensureFullItemMedia ? window.KuroSupabase.ensureFullItemMedia(item) : Promise.resolve()
+    ]);
+  }
+
   const imageArg = (item.images && Array.isArray(item.images) && item.images.length > 0)
     ? item.images
     : (window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : `/api/items/${item.id}/file`));
@@ -426,10 +471,16 @@ async function copyCardCombined(itemId, btn) {
   }
 }
 
-function downloadItemFile(itemId) {
+async function downloadItemFile(itemId) {
   const item = (window.currentItems || []).find(i => String(i.id) === String(itemId));
   if (item) {
-    const fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
+    let fileUrl = '';
+    if (window.KuroSupabase && window.KuroSupabase.ensureFullItemMedia) {
+      fileUrl = await window.KuroSupabase.ensureFullItemMedia(item);
+    }
+    if (!fileUrl) {
+      fileUrl = window.getItemFileUrl ? window.getItemFileUrl(item) : (typeof item.file_path === 'string' ? item.file_path : '');
+    }
     if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.startsWith('http') || fileUrl.startsWith('blob:') || fileUrl.startsWith('./') || fileUrl.startsWith('/'))) {
       const a = document.createElement('a');
       a.href = fileUrl;
