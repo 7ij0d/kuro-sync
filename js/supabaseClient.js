@@ -29,12 +29,12 @@ const KuroSupabase = {
     let stored = '';
     try {
       stored = localStorage.getItem('kuro_supabase_url') || '';
-      if (stored && (stored.includes('vqrpodmnzubpcsvqohwj') || stored.includes('placeholder'))) {
+      if (stored && (stored.includes('vqrpodmnzubpcsvqohwj') || stored.includes('placeholder') || stored.includes('sslip.io'))) {
         localStorage.removeItem('kuro_supabase_url');
         stored = '';
       }
     } catch (e) {}
-    return stored || (window.KURO_CONFIG && window.KURO_CONFIG.SUPABASE_URL) || 'https://102-203-202-115.sslip.io';
+    return stored || (window.KURO_CONFIG && window.KURO_CONFIG.SUPABASE_URL) || 'https://api.kurofangs.id.ly';
   },
 
   getKey() {
