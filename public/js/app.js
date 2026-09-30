@@ -738,3 +738,29 @@ window.loadSamplePack = loadSamplePack;
 window.openItemOptionsMenu = openItemOptionsMenu;
 window.toggleTheme = toggleTheme;
 window.toggleLanguage = toggleLanguage;
+
+window.triggerManualSync = async function() {
+  const icon = document.getElementById('sync-btn-icon');
+  const label = document.getElementById('sync-btn-label');
+  const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+  
+  if (icon) icon.style.animation = 'spin 0.8s linear infinite';
+  if (label) label.textContent = isAr ? 'جارٍ المزامنة...' : 'Syncing...';
+  
+  try {
+    if (window.KuroSupabase && typeof window.KuroSupabase.syncPendingLocalItems === 'function') {
+      await window.KuroSupabase.syncPendingLocalItems();
+    }
+    if (typeof window.refreshItems === 'function') {
+      await window.refreshItems(true);
+    }
+    if (window.utils && typeof window.utils.showToast === 'function') {
+      window.utils.showToast(isAr ? 'تمت المزامنة وتحديث الملفات بنجاح ☁️' : 'Synced successfully! ☁️');
+    }
+  } catch (e) {
+    console.warn('Manual sync note:', e);
+  } finally {
+    if (icon) icon.style.animation = '';
+    if (label) label.textContent = isAr ? 'مزامنة الآن' : 'Sync Now';
+  }
+};

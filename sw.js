@@ -2,7 +2,7 @@
 // KURO SYNC SERVICE WORKER (v13 - Network First)
 // ==========================================================
 
-const CACHE_NAME = 'kuro-sync-v13';
+const CACHE_NAME = 'kuro-sync-v14';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -33,8 +33,14 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET
   if (event.request.method !== 'GET') return;
 
-  // WebSocket or Supabase API: bypass SW completely
-  if (url.pathname.startsWith('/ws') || url.hostname.includes('supabase.co')) {
+  // Supabase API, VPS Cloud API, Storage, or WebSockets: BYPASS SW COMPLETELY
+  if (
+    url.pathname.startsWith('/ws') ||
+    url.hostname.includes('kurofangs.id.ly') ||
+    url.hostname.includes('supabase') ||
+    url.pathname.startsWith('/rest/') ||
+    url.pathname.startsWith('/storage/')
+  ) {
     return;
   }
 

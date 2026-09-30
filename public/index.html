@@ -280,6 +280,14 @@
               <span>☁️ سوبابيز</span>
             </button>
 
+            <!-- Manual Trigger Sync Button -->
+            <button class="btn-card-action" id="btn-manual-sync" style="height:32px; font-size:0.78rem; gap:6px; font-weight:700;" onclick="triggerManualSync()" title="مزامنة فورية الآن واسترجاع أي عناصر معلقة من الآيباد">
+              <svg id="sync-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              <span id="sync-btn-label">مزامنة الآن</span>
+            </button>
+
             <!-- Realtime Sync Indicator -->
             <div class="sync-indicator-pill" id="realtime-indicator" title="Cross-Device Synchronization State">
               <span class="pulse-dot" id="realtime-pulse-dot"></span>
@@ -675,31 +683,31 @@
   <div id="toast-container"></div>
 
   <!-- Scripts -->
-  <script src="./js/config.js?v=3.8"></script>
-  <script src="./js/supabaseClient.js?v=3.8"></script>
-  <script src="./js/i18n.js?v=3.8"></script>
-  <script src="./js/utils.js?v=3.8"></script>
-  <script src="./js/api.js?v=3.8"></script>
-  <script src="./js/realtime.js?v=3.8"></script>
-  <script src="./js/clipboard.js?v=3.8"></script>
-  <script src="./js/offline.js?v=3.8"></script>
-  <script src="./js/components/card.js?v=3.8"></script>
-  <script src="./js/components/newModal.js?v=3.8"></script>
-  <script src="./js/components/viewerModal.js?v=3.8"></script>
-  <script src="./js/components/deviceModal.js?v=3.8"></script>
-  <script src="./js/components/storageModal.js?v=3.8"></script>
-  <script src="./js/components/shareModal.js?v=3.8"></script>
-  <script src="./js/components/authModal.js?v=3.8"></script>
-  <script src="./js/components/cloudModal.js?v=3.8"></script>
-  <script src="./js/components/sidebar.js?v=3.8"></script>
-  <script src="./js/components/header.js?v=3.8"></script>
-  <script src="./js/app.js?v=3.8"></script>
+  <script src="./js/config.js?v=14.0"></script>
+  <script src="./js/supabaseClient.js?v=14.0"></script>
+  <script src="./js/i18n.js?v=14.0"></script>
+  <script src="./js/utils.js?v=14.0"></script>
+  <script src="./js/api.js?v=14.0"></script>
+  <script src="./js/realtime.js?v=14.0"></script>
+  <script src="./js/clipboard.js?v=14.0"></script>
+  <script src="./js/offline.js?v=14.0"></script>
+  <script src="./js/components/card.js?v=14.0"></script>
+  <script src="./js/components/newModal.js?v=14.0"></script>
+  <script src="./js/components/viewerModal.js?v=14.0"></script>
+  <script src="./js/components/deviceModal.js?v=14.0"></script>
+  <script src="./js/components/storageModal.js?v=14.0"></script>
+  <script src="./js/components/shareModal.js?v=14.0"></script>
+  <script src="./js/components/authModal.js?v=14.0"></script>
+  <script src="./js/components/cloudModal.js?v=14.0"></script>
+  <script src="./js/components/sidebar.js?v=14.0"></script>
+  <script src="./js/components/header.js?v=14.0"></script>
+  <script src="./js/app.js?v=14.0"></script>
 
   <!-- Register & Update Service Worker -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=3.8').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=14.0').then(reg => {
           if (reg && reg.update) reg.update();
         }).catch(err => console.log('SW registration error:', err));
       });

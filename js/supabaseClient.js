@@ -17,7 +17,7 @@ const KuroSupabase = {
   _allItemsCache: null,
   _lastSyncTimestamp: 0,
   _syncInFlight: null,
-  SYNC_TTL_MS: 30000, // 30s in-memory freshness window unless mutated
+  SYNC_TTL_MS: 4000, // 4s freshness window for rapid real-time updates
 
   getUrl() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -29,7 +29,7 @@ const KuroSupabase = {
     let stored = '';
     try {
       stored = localStorage.getItem('kuro_supabase_url') || '';
-      if (stored && (stored.includes('vqrpodmnzubpcsvqohwj') || stored.includes('placeholder') || stored.includes('sslip.io'))) {
+      if (stored && (!stored.includes('api.kurofangs.id.ly') || stored.includes('sslip.io') || stored.includes('102.203.202.115') || stored.includes('placeholder'))) {
         localStorage.removeItem('kuro_supabase_url');
         stored = '';
       }
@@ -150,12 +150,24 @@ const KuroSupabase = {
     const key = this.getKey();
     const url = `${baseUrl}/storage/v1/object/${STORAGE_BUCKET}/${storagePath}`;
 
+    let resolvedContentType = 'application/octet-stream';
+    if (blobOrBuffer && blobOrBuffer.type) {
+      resolvedContentType = blobOrBuffer.type;
+    } else {
+      const lower = (storagePath || '').toLowerCase();
+      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) resolvedContentType = 'image/jpeg';
+      else if (lower.endsWith('.png')) resolvedContentType = 'image/png';
+      else if (lower.endsWith('.webp')) resolvedContentType = 'image/webp';
+      else if (lower.endsWith('.pdf')) resolvedContentType = 'application/pdf';
+      else if (lower.endsWith('.txt')) resolvedContentType = 'text/plain; charset=utf-8';
+    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'apikey': key,
         'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/pdf',
+        'Content-Type': resolvedContentType,
         'cache-control': 'max-age=31536000',
         'x-upsert': 'true'
       },
@@ -167,6 +179,59 @@ const KuroSupabase = {
       throw new Error(`Storage upload failed (${res.status}): ${errText}`);
     }
     return this.getPublicStorageUrl(storagePath);
+  },
+
+  // Auto-sync any local items stored on iPad/device (from offline or momentary connection error) to Supabase Cloud
+  async syncPendingLocalItems() {
+    if (!this.isConfigured()) return;
+    try {
+      const rawLocal = localStorage.getItem('kuro_local_items');
+      if (!rawLocal) return;
+      let localItems = [];
+      try { localItems = JSON.parse(rawLocal); } catch (e) { return; }
+      if (!Array.isArray(localItems) || localItems.length === 0) return;
+
+      console.log(`[KuroSupabase] Found ${localItems.length} pending local items on device. Syncing to Supabase Cloud...`);
+      let uploadedCount = 0;
+      const remainingItems = [];
+
+      for (const item of localItems) {
+        if (!item) continue;
+        try {
+          const itemId = String(item.id || item.item_id || '');
+          if (!itemId) continue;
+          // Check if already on cloud
+          const check = await this.request(`/settings?key=eq.ks_item_${encodeURIComponent(itemId)}&select=key`);
+          if (Array.isArray(check) && check.length > 0) {
+            continue; // Already on cloud
+          }
+          await this.createItem(item);
+          uploadedCount++;
+        } catch (uploadErr) {
+          console.warn('[KuroSupabase] Failed to sync local item:', item.id, uploadErr);
+          remainingItems.push(item);
+        }
+      }
+
+      if (remainingItems.length === 0) {
+        localStorage.removeItem('kuro_local_items');
+      } else {
+        localStorage.setItem('kuro_local_items', JSON.stringify(remainingItems));
+      }
+
+      if (uploadedCount > 0) {
+        const isAr = window.i18n ? window.i18n.currentLang === 'ar' : true;
+        if (window.utils && typeof window.utils.showToast === 'function') {
+          window.utils.showToast(isAr ? `تمت مزامنة ${uploadedCount} عناصر وملاحظات من الآيباد مع السحابة بنجاح ☁️` : `Synced ${uploadedCount} items from iPad to cloud ☁️`);
+        }
+        await this.syncMetadataFromCloud(true);
+        if (typeof window.refreshItems === 'function') {
+          window.refreshItems(true);
+        }
+      }
+    } catch (err) {
+      console.warn('[KuroSupabase] syncPendingLocalItems exception:', err);
+    }
   },
 
   // Resolve a Supabase Storage URL into a browser-renderable Blob URL with CacheStorage persistence

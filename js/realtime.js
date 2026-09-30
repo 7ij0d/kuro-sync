@@ -71,29 +71,39 @@ class RealtimeClient {
   startSupabasePoller() {
     if (this.pollTimer) clearInterval(this.pollTimer);
 
+    // Immediately trigger local recovery for any items added on iPad while offline
+    if (window.KuroSupabase && typeof window.KuroSupabase.syncPendingLocalItems === 'function') {
+      window.KuroSupabase.syncPendingLocalItems().catch(() => {});
+    }
+
     if (!this._focusBound) {
       this._focusBound = true;
       window.addEventListener('focus', () => {
-        if (typeof window.refreshItems === 'function') window.refreshItems();
+        if (window.KuroSupabase?.syncPendingLocalItems) window.KuroSupabase.syncPendingLocalItems().catch(() => {});
+        if (typeof window.refreshItems === 'function') window.refreshItems(true);
       });
       window.addEventListener('online', () => {
         this.setStatus('synced');
-        if (typeof window.refreshItems === 'function') window.refreshItems();
+        if (window.KuroSupabase?.syncPendingLocalItems) window.KuroSupabase.syncPendingLocalItems().catch(() => {});
+        if (typeof window.refreshItems === 'function') window.refreshItems(true);
       });
       window.addEventListener('offline', () => {
         this.setStatus('offline');
       });
     }
 
-    // Cross-device synchronization interval (6 seconds)
+    // High-performance cross-device delta synchronization interval (4 seconds)
     this.pollTimer = setInterval(async () => {
       if (document.hidden) return; // Do not waste bandwidth if tab in background
+      if (window.KuroSupabase?.syncPendingLocalItems) {
+        window.KuroSupabase.syncPendingLocalItems().catch(() => {});
+      }
       if (typeof window.refreshItems === 'function') {
         try {
-          await window.refreshItems();
+          await window.refreshItems(false);
         } catch (e) {}
       }
-    }, 6000);
+    }, 4000);
   }
 
   handleEvent(event) {
